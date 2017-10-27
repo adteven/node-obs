@@ -451,7 +451,7 @@ Local<Array> OBS_settings::getStreamSettings()
 				const char* name = obs_property_list_item_name(property, i);
 				const char* value = obs_property_list_item_string(property, i);
 
-				parameterValue->Set(String::NewFromUtf8(isolate, name),
+        parameterValue->Set(String::NewFromUtf8(isolate, name),
 									String::NewFromUtf8(isolate, value));
 
 				formatString = "OBS_PROPERTY_LIST";
