@@ -11,7 +11,7 @@
 #include <locale>
 #include <codecvt>
 #include <string>
-#include <windows.h>
+// #include <windows.h>
 #include <ShlObj.h>
 #endif
 
@@ -19,6 +19,22 @@
 #include <direct.h>
 #define getcwd _getcwd
 #endif
+
+#include <util/windows/win-version.h>
+#include <util/platform.h>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <Dwmapi.h>
+#include <psapi.h>
+#include <mmdeviceapi.h>
+#include <audiopolicy.h>
+
+#include <util/windows/WinHandle.hpp>
+#include <util/windows/HRError.hpp>
+#include <util/windows/ComPtr.hpp>
 
 std::string appdata_path;
 vector<pair<obs_module_t *, int>> listModules;
@@ -483,7 +499,49 @@ void OBS_API::initAPI(void)
 
 	OBS_service::setServiceToTheStreamingOutput();
 
+	setAudioDeviceMonitoring();
+}
 
+bool DisableAudioDucking(bool disable)
+{
+	ComPtr<IMMDeviceEnumerator>   devEmum;
+	ComPtr<IMMDevice>             device;
+	ComPtr<IAudioSessionManager2> sessionManager2;
+	ComPtr<IAudioSessionControl>  sessionControl;
+	ComPtr<IAudioSessionControl2> sessionControl2;
+
+	HRESULT result = CoCreateInstance(__uuidof(MMDeviceEnumerator),
+			nullptr, CLSCTX_INPROC_SERVER,
+			__uuidof(IMMDeviceEnumerator),
+			(void **)&devEmum);
+	if (FAILED(result))
+		return false;
+
+	result = devEmum->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+	if (FAILED(result))
+		return false;
+
+	result = device->Activate(__uuidof(IAudioSessionManager2),
+			CLSCTX_INPROC_SERVER, nullptr,
+			(void **)&sessionManager2);
+	if (FAILED(result))
+		return false;
+
+	result = sessionManager2->GetAudioSessionControl(nullptr, 0,
+			&sessionControl);
+	if (FAILED(result))
+		return false;
+
+	result = sessionControl->QueryInterface(&sessionControl2);
+	if (FAILED(result))
+		return false;
+
+	result = sessionControl2->SetDuckingPreference(disable);
+	return SUCCEEDED(result);
+}
+
+void OBS_API::setAudioDeviceMonitoring(void)
+{
     /* load audio monitoring */
 #if defined(_WIN32) || defined(__APPLE__)
     std::string basicConfigFile = OBS_API::getBasicConfigPath();
@@ -497,11 +555,17 @@ void OBS_API::initAPI(void)
     obs_set_audio_monitoring_device(device_name, device_id);
 
     blog(LOG_INFO, "Audio monitoring device:\n\tname: %s\n\tid: %s",
-            device_name, device_id);
+			device_name, device_id);
+
+	bool disableAudioDucking = config_get_bool(config, "Audio",
+			"DisableAudioDucking");
+	if (disableAudioDucking)
+		DisableAudioDucking(true);
 #endif
 }
 
-bool OBS_API::initOBS_API() {
+bool OBS_API::initOBS_API()
+{
 	std::vector<char> userData = std::vector<char>(1024);
 	os_get_config_path(userData.data(), userData.capacity() - 1, "slobs-client/plugin_config");
 	obs_startup("en-US", userData.data(), NULL);
@@ -517,25 +581,25 @@ bool OBS_API::initOBS_API() {
 
 	std::string profiles = OBS_pathConfigDirectory + "\\basic\\profiles";
 	std::string scenes = OBS_pathConfigDirectory + "\\basic\\scenes";
-	
-	isOBS_installedValue = dirExists(OBS_pathConfigDirectory) && 
+
+	isOBS_installedValue = dirExists(OBS_pathConfigDirectory) &&
 		containsDirectory(profiles) &&
 		os_file_exists(scenes.c_str());
 
 	if(isOBS_installedValue) {
 	    v8::String::Utf8Value firstProfile(getOBS_existingProfiles()->Get(0)->ToString());
-	    OBS_currentProfile = std::string(*firstProfile);  
+	    OBS_currentProfile = std::string(*firstProfile);
 
 	    v8::String::Utf8Value firstSceneCollection(getOBS_existingSceneCollections()->Get(0)->ToString());
-	    OBS_currentSceneCollection = std::string(*firstSceneCollection); 
-	} 
+	    OBS_currentSceneCollection = std::string(*firstSceneCollection);
+	}
 
 	/* Logging */
 	string filename = GenerateTimeDateFilename("txt");
 	string log_path = appdata_path;
 	log_path.append("/logs/");
 
-	/* Make sure the path is created 
+	/* Make sure the path is created
 	   before attempting to make a file there. */
 	if (os_mkdirs(log_path.c_str()) == MKDIR_ERROR) {
 		cerr << "Failed to open log file" << endl;
@@ -580,6 +644,16 @@ static void SaveProfilerData(const profiler_snapshot_t *snap)
 
 void OBS_API::destroyOBS_API(void) {
     os_cpu_usage_info_destroy(cpuUsageInfo);
+
+#ifdef _WIN32
+	std::string basicConfigFile = OBS_API::getBasicConfigPath();
+	config_t* config = OBS_API::openConfigFile(basicConfigFile);
+
+	bool disableAudioDucking = config_get_bool(config, "Audio",
+			"DisableAudioDucking");
+	if (disableAudioDucking)
+		DisableAudioDucking(false);
+#endif
 
 	obs_encoder_t* streamingEncoder = OBS_service::getStreamingEncoder();
 	if(streamingEncoder != NULL)

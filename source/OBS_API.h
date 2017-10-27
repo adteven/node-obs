@@ -10,6 +10,8 @@
 #include <math.h>
 #include "OBS_service.h"
 
+
+
 using namespace std;
 using namespace v8;
 
@@ -79,22 +81,24 @@ private:
 	static bool		isOBS_installed(void);
 
 public:
-	static std::string getPathConfigDirectory(void);
-	static void setPathConfigDirectory(std::string newPathConfigDirectory);
-	static Local<Array> getOBS_existingProfiles(void);
-	static Local<Array> getOBS_existingSceneCollections(void);
-	static std::string getOBS_currentProfile(void);
-	static void setOBS_currentProfile(std::string profileName);
-	static std::string getOBS_currentSceneCollection(void);
-	static void setOBS_currentSceneCollection(std::string sceneCollectionName);
-	static bool isOBS_configFilesUsed(void);
-	static std::vector<Screen> availableResolutions(void); 
+	static std::string 			getPathConfigDirectory(void);
+	static void 				setPathConfigDirectory(std::string newPathConfigDirectory);
+	static Local<Array> 		getOBS_existingProfiles(void);
+	static Local<Array> 		getOBS_existingSceneCollections(void);
+	static std::string 			getOBS_currentProfile(void);
+	static void 				setOBS_currentProfile(std::string profileName);
+	static std::string 			getOBS_currentSceneCollection(void);
+	static void 				setOBS_currentSceneCollection(std::string sceneCollectionName);
+	static bool 				isOBS_configFilesUsed(void);
+	static std::vector<Screen> 	availableResolutions(void); 
 
 
 	static std::string getGlobalConfigPath(void);
 	static std::string getBasicConfigPath(void);
 	static std::string getServiceConfigPath(void);
 	static std::string getContentConfigPath(void);
+
+	static void setAudioDeviceMonitoring(void);
 
 	// Encoders
 	static std::string getStreamingEncoderConfigPath(void);

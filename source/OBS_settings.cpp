@@ -435,21 +435,21 @@ Local<Array> OBS_settings::getStreamSettings()
 			if (format == OBS_COMBO_FORMAT_INT)
 			{
 				long long value = obs_property_list_item_int(property, i);
-				parameterValue->Set(String::NewFromUtf8(isolate, obs_property_list_item_name(property, i)), 
+				parameterValue->Set(String::NewFromUtf8(isolate, obs_property_list_item_name(property, i)),
 									Integer::New(isolate, value));
 				formatString = "OBS_PROPERTY_INT";
 			}
 			else if (format == OBS_COMBO_FORMAT_FLOAT)
 			{
 				double value = obs_property_list_item_float(property, i);
-				parameterValue->Set(String::NewFromUtf8(isolate, obs_property_list_item_name(property, i)), 
+				parameterValue->Set(String::NewFromUtf8(isolate, obs_property_list_item_name(property, i)),
 									Integer::New(isolate, value));
 				formatString = "OBS_PROPERTY_DOUBLE";
 			}
 			else if (format == OBS_COMBO_FORMAT_STRING)
 			{
 				int index = i;
-				if (strcmp(obs_property_name(property), "server") == 0 && 
+				if (strcmp(obs_property_name(property), "server") == 0 &&
 					strcmp(currentServiceName, "Twitch") == 0) {
 					if (i == 0) {
 						parameterValue->Set(String::NewFromUtf8(isolate, "(Auto Recommended)"),
@@ -457,11 +457,12 @@ Local<Array> OBS_settings::getStreamSettings()
 					} else {
 						index--;
 					}
-				} 
-				const char* name = obs_property_list_item_name(property, i);
-				const char* value = obs_property_list_item_string(property, i);
-				parameterValue->Set(String::NewFromUtf8(isolate, obs_property_list_item_name(property, index)),
-				String::NewFromUtf8(isolate, value));
+				}
+				const char* name = obs_property_list_item_name(property, index);
+				const char* value = obs_property_list_item_string(property, index);
+
+				parameterValue->Set(String::NewFromUtf8(isolate, name),
+									String::NewFromUtf8(isolate, value));
 
 				formatString = "OBS_PROPERTY_LIST";
 			} else {
@@ -654,15 +655,12 @@ void OBS_settings::saveStreamSettings(Local<Array> streamSettings)
 			} else if(type.compare("OBS_PROPERTY_INT") == 0 ||
 					  type.compare("OBS_PROPERTY_UINT") == 0) {
 				int64_t value = object->Get(String::NewFromUtf8(isolate, "currentValue"))->NumberValue();
-				cout << "value " << value << endl;
 				obs_data_set_int(settings, name.c_str(), value);
 			} else if(type.compare("OBS_PROPERTY_BOOL") == 0) {
 				uint64_t value = object->Get(String::NewFromUtf8(isolate, "currentValue"))->NumberValue();
-				cout << "value " << value << endl;
 				obs_data_set_bool(settings, name.c_str(), value);
 			} else if(type.compare("OBS_PROPERTY_DOUBLE") == 0) {
 				double value = object->Get(String::NewFromUtf8(isolate, "currentValue"))->NumberValue();
-				cout << "value " << value << endl;
 				obs_data_set_double(settings, name.c_str(), value);
 			} 
 		}
@@ -3027,6 +3025,7 @@ Local<Array>  OBS_settings::getAdvancedSettings()
 	monitoringDevice->push_back(std::make_pair("name", "MonitoringDeviceName"));
 	monitoringDevice->push_back(std::make_pair("type", "OBS_PROPERTY_LIST"));
 	monitoringDevice->push_back(std::make_pair("description", "Audio Monitoring Device"));
+	monitoringDevice->push_back(std::make_pair("currentValue", monDevName));
 	monitoringDevice->push_back(std::make_pair("Default", "Default"));
 
 	auto enum_devices = [] (void *param, const char *name, const char *id)
@@ -3038,6 +3037,13 @@ Local<Array>  OBS_settings::getAdvancedSettings()
 	};
 	obs_enum_audio_monitoring_devices(enum_devices, monitoringDevice);
 	entries.push_back(*monitoringDevice);
+
+	//Windows audio ducking
+	std::vector<std::pair<std::string, std::string>> disableAudioDucking;
+	disableAudioDucking.push_back(std::make_pair("name", "DisableAudioDucking"));
+	disableAudioDucking.push_back(std::make_pair("type", "OBS_PROPERTY_BOOL"));
+	disableAudioDucking.push_back(std::make_pair("description", "Disable Windows audio ducking"));
+	entries.push_back(disableAudioDucking);
 
 	advancedSettings->Set(2, serializeSettingsData("Audio", entries, config, "Audio", true, true));
 	entries.clear();
@@ -3283,6 +3289,7 @@ void OBS_settings::saveSettings(std::string nameCategory, Local<Array> settings)
 		OBS_service::resetVideoContext(NULL);
 	} else if (nameCategory.compare("Advanced") == 0) {
 		saveAdvancedSettings(settings);
+		OBS_API::setAudioDeviceMonitoring();
 	}
 }
 
@@ -3315,7 +3322,42 @@ void OBS_settings::saveGenericSettings(Local<Array> genericSettings, std::string
 				type.compare("OBS_PROPERTY_PATH") == 0) {
 				v8::String::Utf8Value param2(parameter->Get(String::NewFromUtf8(isolate, "currentValue")));
 				value = std::string(*param2);
-				config_set_string(config, section.c_str(), name.c_str(), value.c_str());
+				if(name.compare("MonitoringDeviceName") == 0) {
+					std::string monDevName;
+					std::string monDevId;
+					if(value.compare("Default") != 0) {
+						std::vector<std::pair<std::string, std::string>> monitoringDevice;
+
+						auto enum_devices = [] (void *param, const char *name, const char *id)
+						{
+							std::vector<std::pair<std::string, std::string>> *monitoringDevice =
+													(std::vector<std::pair<std::string, std::string>>*)param;
+							monitoringDevice->push_back(std::make_pair(name, id));
+							return true;
+						};
+						obs_enum_audio_monitoring_devices(enum_devices, &monitoringDevice);
+
+						std::vector<pair<std::string, std::string>>::iterator it =
+						std::find_if(monitoringDevice.begin(), monitoringDevice.end(),
+							[&value] (const pair<std::string, std::string> device)
+							{
+								return (device.first.compare(value) == 0);
+							});
+
+						if (it != monitoringDevice.end()) {
+							monDevName = it->first;
+							monDevId = it->second;
+						}
+					} else {
+						monDevName = value;
+						monDevId = "default";
+					}
+
+					config_set_string(config, section.c_str(), "MonitoringDeviceName", monDevName.c_str());
+					config_set_string(config, section.c_str(), "MonitoringDeviceId", monDevId.c_str());
+				} else {
+					config_set_string(config, section.c_str(), name.c_str(), value.c_str());
+				}
 			} else if(type.compare("OBS_PROPERTY_INT") == 0) {
 				int64_t value = parameter->Get(String::NewFromUtf8(isolate, "currentValue"))->NumberValue();
 				config_set_int(config, section.c_str(), name.c_str(), value);
