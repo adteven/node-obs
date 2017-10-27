@@ -448,20 +448,10 @@ Local<Array> OBS_settings::getStreamSettings()
 			}
 			else if (format == OBS_COMBO_FORMAT_STRING)
 			{
-				int index = i;
-				if (strcmp(obs_property_name(property), "server") == 0 &&
-					strcmp(currentServiceName, "Twitch") == 0) {
-					if (i == 0) {
-						parameterValue->Set(String::NewFromUtf8(isolate, "(Auto Recommended)"),
-							String::NewFromUtf8(isolate, "rtmp://live.twitch.tv/app"));
-					} else {
-						index--;
-					}
-				}
-				const char* name = obs_property_list_item_name(property, index);
-				const char* value = obs_property_list_item_string(property, index);
+				const char* name = obs_property_list_item_name(property, i);
+				const char* value = obs_property_list_item_string(property, i);
 
-				parameterValue->Set(String::NewFromUtf8(isolate, name),
+        parameterValue->Set(String::NewFromUtf8(isolate, name),
 									String::NewFromUtf8(isolate, value));
 
 				formatString = "OBS_PROPERTY_LIST";
