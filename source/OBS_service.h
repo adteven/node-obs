@@ -27,11 +27,21 @@
 #include <unistd.h>
 #endif
 
+
 #define SIMPLE_ENCODER_X264                    "obs_x264"
 #define SIMPLE_ENCODER_X264_LOWCPU             "obs_x264"
 #define SIMPLE_ENCODER_QSV                     "obs_qsv11"
 #define SIMPLE_ENCODER_NVENC                   "ffmpeg_nvenc"
 #define SIMPLE_ENCODER_AMD                     "amd_amf_h264"
+
+#define OUTPUT_START							"start"
+#define OUTPUT_STOP								"stop"
+#define OUTPUT_STARTING							"starting"
+#define OUTPUT_STOPPING							"stopping"
+#define OUTPUT_DESACTIVATE						"deactivate"
+#define OUTPUT_RECONNECT						"reconnect"
+#define OUTPUT_RECONNECT_SUCCESS				"reconnect_success"
+
 
 using namespace std;
 using namespace v8;

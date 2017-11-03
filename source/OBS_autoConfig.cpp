@@ -183,7 +183,7 @@ void event_main_loop_cb(uv_async_t* handle) {
 		        Nan::New("percentage").ToLocalChecked(),
 		        Nan::New(data.percentage));	
 	    }
-	    	       
+
         v8::Local<v8::Value> params[] = {
             result
         };

@@ -1,7 +1,10 @@
 #include "OBS_service.h"
 
+#include "OBS_common.h"
+
 #include <windows.h>
 #include <ShlObj.h>
+
 
 obs_output_t* streamingOutput;
 obs_output_t* recordingOutput;
@@ -20,6 +23,13 @@ bool recordingConfigured = false;
 bool ffmpegOutput = false;
 bool lowCPUx264 = false;
 
+struct callbackOutputState {
+	std::vector<std::string> signals;
+    obs::CallbackInfo *cb;
+};
+
+callbackOutputState *streamingOutputState;
+callbackOutputState *recordingOutputState;
 
 OBS_service::OBS_service()
 {
@@ -58,7 +68,7 @@ void OBS_service::OBS_service_createVideoRecordingEncoder(const FunctionCallback
 void OBS_service::OBS_service_createService(const FunctionCallbackInfo<Value>& args)
 {
 	createService();
-}	
+}
 
 void OBS_service::OBS_service_createRecordingSettings(const FunctionCallbackInfo<Value>& args)
 {
@@ -1269,10 +1279,29 @@ void OBS_service::createRecordingOutput(void)
     // updateRecordingOutput();
 }
 
+void connectSignals(obs_output_t *output, callbackOutputState *callbackSignals) {
+    signal_handler *sh = obs_output_get_signal_handler(output);
+
+    std::vector<std::string> signals = callbackSignals->signals;
+
+    for(int i=0;i<signals.size();i++) {
+        auto function = [] (void *data, calldata_t *)
+        {
+            std::pair<std::string, obs::CallbackInfo*> &signal =
+            *reinterpret_cast<std::pair<std::string, obs::CallbackInfo*>*>(data);
+        };
+        std::pair<std::string, obs::CallbackInfo*> signalCallback =
+            std::make_pair(signals.at(i), callbackSignals->cb);
+        signal_handler_connect(sh, signals.at(i).c_str(), function, &(signals.at(i)));
+    }
+}
+
 bool OBS_service::startStreaming(void)
 {
     updateService();
     updateStreamSettings();
+
+    connectSignals(streamingOutput, streamingOutputState);
 
     return obs_output_start(streamingOutput);
 }
