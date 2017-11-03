@@ -2700,9 +2700,9 @@ Local<Array>  OBS_settings::getVideoSettings()
 	scaleType.push_back(std::make_pair("name", "ScaleType"));
 	scaleType.push_back(std::make_pair("type", "OBS_PROPERTY_LIST"));
 	scaleType.push_back(std::make_pair("description", "Downscale Filter"));
-	scaleType.push_back(std::make_pair("bilinear", "Bilinear (Fastest, but blurry if scaling)"));
-	scaleType.push_back(std::make_pair("bicubic", "Bicubic (Sharpened scaling, 16 samples"));
-	scaleType.push_back(std::make_pair("lanczos", "Lanczos (Sharpened scaling, 32 samples)"));
+	scaleType.push_back(std::make_pair("Bilinear (Fastest, but blurry if scaling)", "bilinear"));
+	scaleType.push_back(std::make_pair("Bicubic (Sharpened scaling, 16 samples", "bicubic"));
+	scaleType.push_back(std::make_pair("Lanczos (Sharpened scaling, 32 samples)", "lanczos"));
 	entries.push_back(scaleType);
 
 	//FPS Type
