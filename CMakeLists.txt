@@ -16,6 +16,16 @@ ENDIF()
 # Detect Architecture (Bitness)
 math(EXPR BITS "8*${CMAKE_SIZEOF_VOID_P}")
 
+# Only allow Debug or Release builds.
+SET(CMAKE_CONFIGURATION_TYPES			"Debug;Release")
+SET(CMAKE_CXX_FLAGS_RELEASE				"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+SET(CMAKE_C_FLAGS_RELEASE				"${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+SET(CMAKE_EXE_LINKER_FLAGS_RELEASE		"${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}")
+SET(CMAKE_MODULE_LINKER_FLAGS_RELEASE	"${CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO}")
+SET(CMAKE_RC_LINKER_FLAGS_RELEASE		"${CMAKE_RC_LINKER_FLAGS_RELWITHDEBINFO}")
+SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE	"${CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO}")
+SET(CMAKE_STATIC_LINKER_FLAGS_RELEASE	"${CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO}")
+
 ################################################################################
 # Dependencies
 ################################################################################
@@ -28,7 +38,7 @@ if (OBSSTUDIOPATH STREQUAL "")
 	return()
 endif()
 
-if (NOT EXISTS "${OBSSTUDIOPATH}/libobs/obs-module.h")
+if (NOT EXISTS "${OBSSTUDIOPATH}/libobs/obs.h")
 	# OBSSTUDIOPATH is invalid
 	message(FATAL_ERROR "'OBSSTUDIOPATH' is invalid, needs to have required headers!")
 	return()
@@ -193,58 +203,19 @@ TARGET_LINK_LIBRARIES(${PROJECT_NAME}
 )
 
 # Distributable Version
-ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy
-	"$<TARGET_FILE:node-obs>"
-	"${node-obs_BINARY_DIR}/distribute/node-obs/$<TARGET_FILE_NAME:node-obs>"
-)
-ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy
-	${node-obs_THIRDPARTY}
-	"${node-obs_BINARY_DIR}/distribute/node-obs"
-)
+INSTALL(TARGETS node-obs DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs")
+INSTALL(FILES $<TARGET_PDB_FILE:node-obs> DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs" OPTIONAL)
+INSTALL(FILES ${node-obs_THIRDPARTY} DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs")
 
 IF (NOT APPLE)
 	# Plugin
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${obsBuildPathOpt}/rundir/RelWithDebInfo/obs-plugins/${obsBitsOpt}bit"
-		"${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins"
-	)
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${obsBuildPath}/rundir/RelWithDebInfo/obs-plugins/${obsBits}bit"
-		"${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins"
-	)
-	# Plugin Data
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${obsBuildPathOpt}/rundir/RelWithDebInfo/data"
-		"${node-obs_BINARY_DIR}/distribute/node-obs/data"
-	)
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${obsBuildPath}/rundir/RelWithDebInfo/data"
-		"${node-obs_BINARY_DIR}/distribute/node-obs/data"
-	)
-ELSE()
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${obsBuildPath}/rundir/RelWithDebInfo/obs-plugins"
-		"${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins"
-	)
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${obsBuildPath}/rundir/RelWithDebInfo/data"
-		"${node-obs_BINARY_DIR}/distribute/node-obs/data"
-	)
-ENDIF()
+	INSTALL(DIRECTORY "${obsBuildPathOpt}/rundir/RelWithDebInfo/obs-plugins/${obsBitsOpt}bit/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins")
+	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/obs-plugins/${obsBits}bit/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins")
 
-# node_modules copy
-IF("${NODE_RUNTIME}" MATCHES "node")
-	ADD_CUSTOM_COMMAND(TARGET node-obs POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${node-obs_BINARY_DIR}/distribute/node-obs"
-		"${PROJECT_SOURCE_DIR}/node-obs"
-	)
+	# Plugin Data
+	INSTALL(DIRECTORY "${obsBuildPathOpt}/rundir/RelWithDebInfo/data/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/data")
+	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/data/" DESTINATION "${obsBuildPath}/rundir/RelWithDebInfo/data")
+ELSE()
+	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/obs-plugins/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins")
+	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/data/" DESTINATION "${obsBuildPath}/rundir/RelWithDebInfo/data")
 ENDIF()
