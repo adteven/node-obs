@@ -18,9 +18,9 @@ std::string serverName;
 std::string server;
 std::string key;
 
-bool hardwareEncodingAvailable = true;
-bool nvencAvailable = true;
-bool qsvAvailable = true;
+bool hardwareEncodingAvailable = false;
+bool nvencAvailable = false;
+bool qsvAvailable = false;
 bool vceAvailable = false;
 
 int startingBitrate = 2500;
@@ -46,6 +46,20 @@ bool cancel = false;
 bool started = false;
 
 bool softwareTested = false;
+
+void TestHardwareEncoding(void)
+{
+	size_t idx = 0;
+	const char *id;
+	while (obs_enum_encoder_types(idx++, &id)) {
+		if (strcmp(id, "ffmpeg_nvenc") == 0)
+			hardwareEncodingAvailable = nvencAvailable = true;
+		else if (strcmp(id, "obs_qsv11") == 0)
+			hardwareEncodingAvailable = qsvAvailable = true;
+		else if (strcmp(id, "amd_amf_h264") == 0)
+			hardwareEncodingAvailable = vceAvailable = true;
+	}
+}
 
 static inline void string_depad_key(std::string &key)
 {
@@ -1066,6 +1080,8 @@ void TestStreamEncoderThread()
 	baseResolutionCX = config_get_int(config, "Video", "BaseCX");
 	baseResolutionCY = config_get_int(config, "Video", "BaseCY");
 
+	TestHardwareEncoding();
+
 	if (!softwareTested) {
 		if (!preferHardware || !hardwareEncodingAvailable) {
 			if (!TestSoftwareEncoding()) {
@@ -1093,6 +1109,8 @@ void TestStreamEncoderThread()
 
 void TestRecordingEncoderThread()
 {
+	TestHardwareEncoding();
+
 	if (!hardwareEncodingAvailable && !softwareTested) {
 		if (!TestSoftwareEncoding()) {
 			return;
