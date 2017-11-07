@@ -1048,8 +1048,8 @@ void OBS_settings::getEncoderSettings(Isolate *isolate, const char *encoderID, o
 				break;
 			}
 		}
-		entryObject->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		entryObject->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
+		entryObject->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, obs_property_visible(property)));
+		entryObject->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, obs_property_enabled(property)));
 		entryObject->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, entryObject);
 		obs_property_next(&property);
