@@ -1140,18 +1140,18 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	subCategoryParameters->Set(index++, EncoderList);
 	
 	// Enforce streaming service encoder settings : boolean
-	Local<Object> EnforceBitrate = Object::New(isolate);
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "name"), String::NewFromUtf8(isolate, "EnforceBitrate"));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "type"), String::NewFromUtf8(isolate, "OBS_PROPERTY_BOOL"));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "description"),
+	Local<Object> ApplyServiceSettings = Object::New(isolate);
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "name"), String::NewFromUtf8(isolate, "ApplyServiceSettings"));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "type"), String::NewFromUtf8(isolate, "OBS_PROPERTY_BOOL"));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "description"),
 							String::NewFromUtf8(isolate, "Enforce streaming service encoder settings"));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "currentValue"),
-						Integer::New(isolate, config_get_bool(config, "AdvOut", "EnforceBitrate")));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "currentValue"),
+						Integer::New(isolate, config_get_bool(config, "AdvOut", "ApplyServiceSettings")));
 
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
-	subCategoryParameters->Set(index++, EnforceBitrate);
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	subCategoryParameters->Set(index++, ApplyServiceSettings);
 	
 	// Rescale Output : boolean
 	Local<Object> Rescale = Object::New(isolate);
