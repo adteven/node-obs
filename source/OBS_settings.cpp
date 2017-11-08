@@ -124,7 +124,7 @@ Local<Object> OBS_settings::serializeSettingsData(std::string nameSubCategory,
 			} else if(type.compare("OBS_PROPERTY_UINT") == 0) {
 				parameter->Set(String::NewFromUtf8(isolate, "currentValue"), Integer::New(isolate, config_get_uint(config, section.c_str(), name.c_str())));
 			} else if(type.compare("OBS_PROPERTY_BOOL") == 0) {
-				parameter->Set(String::NewFromUtf8(isolate, "currentValue"), Integer::New(isolate, config_get_bool(config, section.c_str(), name.c_str())));
+				parameter->Set(String::NewFromUtf8(isolate, "currentValue"), Boolean::New(isolate, config_get_bool(config, section.c_str(), name.c_str())));
 			} else if(type.compare("OBS_PROPERTY_DOUBLE") == 0) {
 				parameter->Set(String::NewFromUtf8(isolate, "currentValue"), Integer::New(isolate, config_get_double(config, section.c_str(), name.c_str())));
 			}
@@ -140,9 +140,9 @@ Local<Object> OBS_settings::serializeSettingsData(std::string nameSubCategory,
 			parameter->Set(String::NewFromUtf8(isolate, "values"), values); 
 		}
 
-		parameter->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, isVisible));
-		parameter->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, isEnabled));
-		parameter->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		parameter->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, isVisible));
+		parameter->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isEnabled));
+		parameter->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 		subCategoryParameters->Set(i, parameter);
 	}
@@ -397,11 +397,11 @@ Local<Array> OBS_settings::getStreamSettings()
 
 	parameter->Set(String::NewFromUtf8(isolate, "currentValue"), String::NewFromUtf8(isolate, obs_service_get_type(currentService)));
 
-	parameter->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	parameter->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
 
-	parameter->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, isCategoryEnabled));
+	parameter->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
 
-	parameter->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	parameter->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 	streamSettings->Set(0, streamType);
 
@@ -539,14 +539,14 @@ Local<Array> OBS_settings::getStreamSettings()
 
 		parameter->Set(String::NewFromUtf8(isolate, "description"), String::NewFromUtf8(isolate, obs_property_description(property)));
 
-		parameter->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, obs_property_visible(property)));
+		parameter->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, obs_property_visible(property)));
 
-		parameter->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, isCategoryEnabled));
+		parameter->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
 
 		if(formatString.compare("OBS_PROPERTY_EDIT_TEXT") == 0 && obs_proprety_text_type(property) == OBS_TEXT_PASSWORD) {
-			parameter->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, true));
+			parameter->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, true));
 		} else {
-			parameter->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+			parameter->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		}
 
 		subCategoryParametersServiceConfiguration->Set(index, parameter);
@@ -710,7 +710,7 @@ void OBS_settings::getAvailableEncoders(std::vector<std::pair<std::string, std::
 	}
 }
 
-void OBS_settings::getSimpleOutputSettings(Local<Array> outputSettings, config_t* config)
+void OBS_settings::getSimpleOutputSettings(Local<Array> outputSettings, config_t* config, bool isCategoryEnabled)
 {
 	Isolate *isolate = v8::Isolate::GetCurrent();
 	std::vector<std::vector<std::pair<std::string, std::string>>> entries;
@@ -849,7 +849,7 @@ void OBS_settings::getSimpleOutputSettings(Local<Array> outputSettings, config_t
 		entries.push_back(x264opts);
 	}
 
-	outputSettings->Set(1, serializeSettingsData("Streaming", entries, config, "SimpleOutput", true, true));
+	outputSettings->Set(1, serializeSettingsData("Streaming", entries, config, "SimpleOutput", true, isCategoryEnabled));
 	entries.clear();
 
 	//Recording
@@ -906,11 +906,11 @@ void OBS_settings::getSimpleOutputSettings(Local<Array> outputSettings, config_t
 	recRB.push_back(std::make_pair("description", "Enable Replay Buffer"));
 	entries.push_back(recRB);
 
-	outputSettings->Set(2, serializeSettingsData("Recording", entries, config, "SimpleOutput", true, true));
+	outputSettings->Set(2, serializeSettingsData("Recording", entries, config, "SimpleOutput", true, isCategoryEnabled));
 }
 
 void OBS_settings::getEncoderSettings(Isolate *isolate, const obs_encoder_t *encoder, obs_data_t *settings,
-										Local<Array>* subCategoryParameters, int index)
+										Local<Array>* subCategoryParameters, int index, bool isCategoryEnabled)
 {
 	obs_properties_t* encoderProperties = obs_encoder_properties(encoder);
 	obs_property_t* property = obs_properties_first(encoderProperties);
@@ -1048,16 +1048,21 @@ void OBS_settings::getEncoderSettings(Isolate *isolate, const obs_encoder_t *enc
 				break;
 			}
 		}
-		entryObject->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, obs_property_visible(property)));
-		entryObject->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, obs_property_enabled(property)));
-		entryObject->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		entryObject->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, obs_property_visible(property)));
+
+		bool isEnabled = obs_property_enabled(property);
+		if(!isCategoryEnabled)
+			isEnabled = isCategoryEnabled;
+
+		entryObject->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isEnabled));
+		entryObject->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, entryObject);
 
 		obs_property_next(&property);
 	}
 }
 
-Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
+Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config, bool isCategoryEnabled)
 {
 	Isolate *isolate = v8::Isolate::GetCurrent();
 	Local<Array> subCategoryParameters = Array::New(isolate);
@@ -1107,9 +1112,9 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	TrackIndex->Set(String::NewFromUtf8(isolate, "currentValue"),
 						String::NewFromUtf8(isolate, TrackIndexCurrentValue));
 
-	TrackIndex->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	TrackIndex->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	TrackIndex->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	TrackIndex->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	TrackIndex->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	TrackIndex->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	subCategoryParameters->Set(index++, TrackIndex);
 
 	// Encoder : list
@@ -1135,9 +1140,9 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 		EncoderListValues->Set(i, object);
 	}
 	EncoderList->Set(String::NewFromUtf8(isolate, "values"), EncoderListValues); 
-	EncoderList->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	EncoderList->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	EncoderList->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	EncoderList->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	EncoderList->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	EncoderList->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	subCategoryParameters->Set(index++, EncoderList);
 	
 	// Enforce streaming service encoder settings : boolean
@@ -1149,9 +1154,9 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "currentValue"),
 						Integer::New(isolate, config_get_bool(config, "AdvOut", "ApplyServiceSettings")));
 
-	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	subCategoryParameters->Set(index++, ApplyServiceSettings);
 	
 	// Rescale Output : boolean
@@ -1161,9 +1166,9 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	Rescale->Set(String::NewFromUtf8(isolate, "description"), String::NewFromUtf8(isolate, "Rescale Output"));
 	bool doRescale = config_get_bool(config, "AdvOut", "Rescale");
 	Rescale->Set(String::NewFromUtf8(isolate, "currentValue"), Integer::New(isolate, doRescale));
-	Rescale->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	Rescale->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	Rescale->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	Rescale->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	Rescale->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	Rescale->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	subCategoryParameters->Set(index++, Rescale);
 	
 
@@ -1196,9 +1201,9 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 			RescaleResValues->Set(i, object);
 		}
 		RescaleRes->Set(String::NewFromUtf8(isolate, "values"), RescaleResValues);
-		RescaleRes->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		RescaleRes->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-		RescaleRes->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		RescaleRes->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+		RescaleRes->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+		RescaleRes->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		subCategoryParameters->Set(index++, RescaleRes);
 	}
 
@@ -1230,7 +1235,7 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 		OBS_service::setStreamingEncoder(streamingEncoder);
 	}
 
-	getEncoderSettings(isolate, streamingEncoder, settings, &subCategoryParameters,index);
+	getEncoderSettings(isolate, streamingEncoder, settings, &subCategoryParameters, index, isCategoryEnabled);
 
 	subCategory->Set(String::NewFromUtf8(isolate, "nameSubCategory"), String::NewFromUtf8(isolate, "Streaming"));
 	subCategory->Set(String::NewFromUtf8(isolate, "parameters"), subCategoryParameters);
@@ -1238,7 +1243,7 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	return subCategory;
 }
 
-void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParameters, config_t* config)
+void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParameters, config_t* config, bool isCategoryEnabled)
 {
 	Isolate *isolate = v8::Isolate::GetCurrent();
 	int index = 1;
@@ -1261,9 +1266,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 			String::NewFromUtf8(isolate, RecFilePathCurrentValue));
 	}
 
-	RecFilePath->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecFilePath->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecFilePath->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecFilePath->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecFilePath->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecFilePath->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecFilePath);
 
 	// Generate File Name without Space : boolean
@@ -1276,9 +1281,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "currentValue"),
 									Integer::New(isolate, config_get_bool(config, "AdvOut", "RecFileNameWithoutSpace")));
 
-	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecFileNameWithoutSpace);
 
 	// Recording Format : list
@@ -1322,9 +1327,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 
 	RecFormat->Set(String::NewFromUtf8(isolate, "values"), RecFormatValues);
 
-	RecFormat->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecFormat->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecFormat->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecFormat->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecFormat->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecFormat->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecFormat);
 
 	// Audio Track : list
@@ -1368,9 +1373,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 
 	RecTracks->Set(String::NewFromUtf8(isolate, "values"), RecTracksValues);
 
-	RecTracks->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecTracks->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecTracks->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecTracks->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecTracks->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecTracks->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecTracks);
 
 	// Encoder : list
@@ -1397,9 +1402,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 	}
 	RecEncoder->Set(String::NewFromUtf8(isolate, "values"), EncoderListValues);
 
-	RecEncoder->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecEncoder->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecEncoder->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecEncoder->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecEncoder);
 
 	// Rescale Output : boolean
@@ -1413,9 +1418,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 	RecRescale->Set(String::NewFromUtf8(isolate, "currentValue"),
 						Integer::New(isolate, doRescale));
 
-	RecRescale->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecRescale->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecRescale->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecRescale->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecRescale->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecRescale->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecRescale);
 
 	// Output Resolution : list
@@ -1448,9 +1453,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 							RecRescaleResValues->Set(i, object);
 		}
 		RecRescaleRes->Set(String::NewFromUtf8(isolate, "values"), RecRescaleResValues);
-		RecRescaleRes->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		RecRescaleRes->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-		RecRescaleRes->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		RecRescaleRes->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+		RecRescaleRes->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+		RecRescaleRes->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, RecRescaleRes);
 	}
 
@@ -1467,9 +1472,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "currentValue"),
 						String::NewFromUtf8(isolate, RecMuxerCustomCurrentValue));
 
-	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecMuxerCustom->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, RecMuxerCustom);
 
 	// Encoder settings
@@ -1496,7 +1501,7 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 		OBS_service::setRecordingEncoder(recordingEncoder);
 	}
 
-	getEncoderSettings(isolate, recordingEncoder, settings, subCategoryParameters,index);
+	getEncoderSettings(isolate, recordingEncoder, settings, subCategoryParameters, index, isCategoryEnabled);
 }
 
 // class OBSFFDeleter
@@ -1517,7 +1522,7 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 
 // using OBSFFCodecDesc = std::unique_ptr<const ff_codec_desc, OBSFFDeleter>;
 
-void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryParameters, config_t* config)
+void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryParameters, config_t* config, bool isCategoryEnabled)
 {
 	Isolate *isolate = v8::Isolate::GetCurrent();
 	int index = 1;
@@ -1544,9 +1549,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 
 	FFOutputToFile->Set(String::NewFromUtf8(isolate, "values"), FFOutputToFileValues);
 
-	FFOutputToFile->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFOutputToFile->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFOutputToFile->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFOutputToFile->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFOutputToFile->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFOutputToFile->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFOutputToFile);
 
 	// File path or URL : path												FFURL
@@ -1562,9 +1567,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 		}
 		FFfile->Set(String::NewFromUtf8(isolate, "currentValue"),
 						String::NewFromUtf8(isolate, FFfileCurrentValue));
-		FFfile->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		FFfile->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-		FFfile->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		FFfile->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+		FFfile->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+		FFfile->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, FFfile);
 	} else {
 		Local<Object> FFURL = Object::New(isolate);
@@ -1578,9 +1583,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 		}
 		FFURL->Set(String::NewFromUtf8(isolate, "currentValue"),
 						String::NewFromUtf8(isolate, FFURLCurrentValue));
-		FFURL->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		FFURL->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-		FFURL->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		FFURL->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+		FFURL->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+		FFURL->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, FFURL);
 	}
 
@@ -1592,9 +1597,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 									String::NewFromUtf8(isolate, "Generate File Name without Space"));
 	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "currentValue"),
 									Integer::New(isolate, config_get_bool(config, "AdvOut", "FFFileNameWithoutSpace")));
-	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFFileNameWithoutSpace->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFFileNameWithoutSpace);
 
 	// Container Format : list 												FFFormat
@@ -1641,9 +1646,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 
 	// FFFormat->Set(String::NewFromUtf8(isolate, "values"), FFFormattValues);
 
-	FFFormat->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFFormat->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFFormat->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFFormat->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFFormat->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFFormat->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFFormat);
 
 	// Container Format Description : text									nothing to save
@@ -1660,9 +1665,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	}
 	FFMCustom->Set(String::NewFromUtf8(isolate, "currentValue"),
 					String::NewFromUtf8(isolate, FFMCustomCurrentValue));
-	FFMCustom->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFMCustom->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFMCustom->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFMCustom->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFMCustom->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFMCustom->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFMCustom);
 
 	// Video Bitrate : int 													FFVBitrate
@@ -1673,9 +1678,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 									String::NewFromUtf8(isolate, "Video Bitrate"));
 	FFVBitrate->Set(String::NewFromUtf8(isolate, "currentValue"),
 									Integer::New(isolate, config_get_int(config, "AdvOut", "FFVBitrate")));
-	FFVBitrate->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFVBitrate->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFVBitrate->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFVBitrate->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFVBitrate->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFVBitrate->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFVBitrate);
 
 	// Keyframe interval (frames) : int 									FFVGOPSize
@@ -1686,9 +1691,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 									String::NewFromUtf8(isolate, "Keyframe interval (frames)"));
 	FFVGOPSize->Set(String::NewFromUtf8(isolate, "currentValue"),
 									Integer::New(isolate, config_get_int(config, "AdvOut", "FFVGOPSize")));
-	FFVGOPSize->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFVGOPSize->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFVGOPSize->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFVGOPSize->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFVGOPSize->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFVGOPSize->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFVGOPSize);
 
 	// Rescale Output : boolean												FFRescale
@@ -1700,9 +1705,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	bool FFRescaleCurrentValue = config_get_bool(config, "AdvOut", "FFRescale");
 	FFRescale->Set(String::NewFromUtf8(isolate, "currentValue"),
 									Integer::New(isolate, FFRescaleCurrentValue));
-	FFRescale->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFRescale->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFRescale->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFRescale->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFRescale->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFRescale->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFRescale);
 
 	if(FFRescaleCurrentValue) {
@@ -1712,9 +1717,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 		FFRescaleRes->Set(String::NewFromUtf8(isolate, "type"), String::NewFromUtf8(isolate, "OBS_PROPERTY_LIST"));
 		FFRescaleRes->Set(String::NewFromUtf8(isolate, "description"),
 										String::NewFromUtf8(isolate, "Output resolutions"));
-		FFRescaleRes->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		FFRescaleRes->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-		FFRescaleRes->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+		FFRescaleRes->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+		FFRescaleRes->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+		FFRescaleRes->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, FFRescaleRes);
 	}
 
@@ -1727,9 +1732,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	bool ignore_compatability = config_get_bool(config, "AdvOut", "FFIgnoreCompat");
 	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "currentValue"),
 							Integer::New(isolate, ignore_compatability));
-	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFIgnoreCompat->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	(*subCategoryParameters)->Set(index++, FFIgnoreCompat);
 
 	// Video Encoder : list 												FFVEncoder / FFVEncoderId
@@ -1808,14 +1813,14 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	// FFVEncoder->Set(String::NewFromUtf8(isolate, "values"), FFVEncoderValues);
 	// FFAEncoder->Set(String::NewFromUtf8(isolate, "values"), FFAEncoderValues);
 
-	FFVEncoder->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFVEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFVEncoder->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFVEncoder->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFVEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFVEncoder->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 	
-	FFAEncoder->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	FFAEncoder->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
 	// FFAEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, codec_has_audio));
-	FFAEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFAEncoder->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFAEncoder->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFAEncoder->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 	// Video Encoder Settings (if any) : edit text 							FFVCustom
 	Local<Object> FFVCustom = Object::New(isolate);
@@ -1829,9 +1834,9 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	}
 	FFVCustom->Set(String::NewFromUtf8(isolate, "currentValue"),
 							String::NewFromUtf8(isolate, FFVCustomCurrentValue));
-	FFVCustom->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	FFVCustom->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFVCustom->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFVCustom->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	FFVCustom->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFVCustom->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 	// Audio Bitrate : list 												FFABitrate
 	Local<Object> FFABitrate = Object::New(isolate);
@@ -1841,10 +1846,10 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 								String::NewFromUtf8(isolate, "Audio Bitrate"));
 	FFABitrate->Set(String::NewFromUtf8(isolate, "currentValue"),
 								Integer::New(isolate, config_get_int(config, "AdvOut", "FFABitrate")));
-	FFABitrate->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	FFABitrate->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
 	// FFABitrate->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, codec_has_audio));
-	FFABitrate->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFABitrate->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFABitrate->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFABitrate->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 	// Audio track : list 													FFAudioTrack
 	Local<Object> FFAudioTrack = Object::New(isolate);
@@ -1879,10 +1884,10 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	TrackIndexValues->Set(5, track6);
 
 	FFAudioTrack->Set(String::NewFromUtf8(isolate, "values"), TrackIndexValues);
-	FFAudioTrack->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	FFAudioTrack->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
 	// FFAudioTrack->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, codec_has_audio));
-	FFAudioTrack->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFAudioTrack->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFAudioTrack->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFAudioTrack->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 	// Audio Encoder Settings (if any) : edit text 							FFACustom
 	Local<Object> FFACustom = Object::New(isolate);
@@ -1897,10 +1902,10 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	}
 	FFACustom->Set(String::NewFromUtf8(isolate, "currentValue"),
 					String::NewFromUtf8(isolate, FFACustomCurrentValue));
-	FFACustom->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	FFACustom->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
 	// FFACustom->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, codec_has_audio));
-	FFACustom->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	FFACustom->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	FFACustom->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	FFACustom->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 
 	(*subCategoryParameters)->Set(index++, FFVEncoder);
@@ -1911,7 +1916,7 @@ void OBS_settings::getFFmpegOutputRecordingSettings(Local<Array>* subCategoryPar
 	(*subCategoryParameters)->Set(index++, FFACustom);
 }
 
-Local<Object> OBS_settings::getAdvancedOutputRecordingSettings(config_t* config)
+Local<Object> OBS_settings::getAdvancedOutputRecordingSettings(config_t* config, bool isCategoryEnabled)
 {
 	Isolate *isolate = v8::Isolate::GetCurrent();
 	Local<Array> subCategoryParameters = Array::New(isolate);
@@ -1945,9 +1950,9 @@ Local<Object> OBS_settings::getAdvancedOutputRecordingSettings(config_t* config)
 	RecType->Set(String::NewFromUtf8(isolate, "currentValue"),
 					String::NewFromUtf8(isolate, RecTypeCurrentValue));
 
-	RecType->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	RecType->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	RecType->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	RecType->Set(String::NewFromUtf8(isolate, "visible"), Boolean::New(isolate, true));
+	RecType->Set(String::NewFromUtf8(isolate, "enabled"), Boolean::New(isolate, isCategoryEnabled));
+	RecType->Set(String::NewFromUtf8(isolate, "masked"), Boolean::New(isolate, false));
 
 	subCategoryParameters->Set(index++, RecType);
 
@@ -1959,11 +1964,11 @@ Local<Object> OBS_settings::getAdvancedOutputRecordingSettings(config_t* config)
 	}
 
 	if(strcmp(currentRecType, "Standard") == 0) {
-		getStandardRecordingSettings(&subCategoryParameters, config);
+		getStandardRecordingSettings(&subCategoryParameters, config, isCategoryEnabled);
 	} else if (strcmp(currentRecType, "Custom Output (FFmpeg)") == 0) {
-		getFFmpegOutputRecordingSettings(&subCategoryParameters, config);
+		getFFmpegOutputRecordingSettings(&subCategoryParameters, config, isCategoryEnabled);
 	} else {
-		getStandardRecordingSettings(&subCategoryParameters, config);
+		getStandardRecordingSettings(&subCategoryParameters, config, isCategoryEnabled);
 	}
 
 	subCategory->Set(String::NewFromUtf8(isolate, "nameSubCategory"), String::NewFromUtf8(isolate, "Recording"));
@@ -1972,7 +1977,7 @@ Local<Object> OBS_settings::getAdvancedOutputRecordingSettings(config_t* config)
 	return subCategory;
 }
 
-void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, config_t* config)
+void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, config_t* config, bool isCategoryEnabled)
 {
 	std::vector<std::vector<std::pair<std::string, std::string>>> entries;
 
@@ -1995,7 +2000,7 @@ void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, c
 	Track1Name.push_back(std::make_pair("description", "Name"));
 	entries.push_back(Track1Name);
 
-	outputSettings->Set(3, serializeSettingsData("Audio - Track 1", entries, config, "AdvOut", true, true));
+	outputSettings->Set(3, serializeSettingsData("Audio - Track 1", entries, config, "AdvOut", true, isCategoryEnabled));
 	entries.clear();
 
 	// Track 2
@@ -2015,7 +2020,7 @@ void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, c
 	Track2Name.push_back(std::make_pair("description", "Name"));
 	entries.push_back(Track2Name);
 
-	outputSettings->Set(4, serializeSettingsData("Audio - Track 2", entries, config, "AdvOut", true, true));
+	outputSettings->Set(4, serializeSettingsData("Audio - Track 2", entries, config, "AdvOut", true, isCategoryEnabled));
 	entries.clear();
 
 	// Track 3
@@ -2034,7 +2039,7 @@ void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, c
 	Track3Name.push_back(std::make_pair("type", "OBS_PROPERTY_EDIT_TEXT"));
 	Track3Name.push_back(std::make_pair("description", "Name"));
 	entries.push_back(Track3Name);
-	outputSettings->Set(5, serializeSettingsData("Audio - Track 3", entries, config, "AdvOut", true, true));
+	outputSettings->Set(5, serializeSettingsData("Audio - Track 3", entries, config, "AdvOut", true, isCategoryEnabled));
 	entries.clear();
 
 
@@ -2055,7 +2060,7 @@ void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, c
 	Track4Name.push_back(std::make_pair("description", "Name"));
 	entries.push_back(Track4Name);
 
-	outputSettings->Set(6, serializeSettingsData("Audio - Track 4", entries, config, "AdvOut", true, true));
+	outputSettings->Set(6, serializeSettingsData("Audio - Track 4", entries, config, "AdvOut", true, isCategoryEnabled));
 	entries.clear();
 
 	// Track 5
@@ -2075,7 +2080,7 @@ void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, c
 	Track5Name.push_back(std::make_pair("description", "Name"));
 	entries.push_back(Track5Name);
 
-	outputSettings->Set(7, serializeSettingsData("Audio - Track 5", entries, config, "AdvOut", true, true));
+	outputSettings->Set(7, serializeSettingsData("Audio - Track 5", entries, config, "AdvOut", true, isCategoryEnabled));
 	entries.clear();
 
 	// Track 6
@@ -2095,22 +2100,22 @@ void OBS_settings::getAdvancedOutputAudioSettings(Local<Array> outputSettings, c
 	Track6Name.push_back(std::make_pair("description", "Name"));
 	entries.push_back(Track6Name);
 
-	outputSettings->Set(8, serializeSettingsData("Audio - Track 6", entries, config, "AdvOut", true, true));
+	outputSettings->Set(8, serializeSettingsData("Audio - Track 6", entries, config, "AdvOut", true, isCategoryEnabled));
 	entries.clear();
 }
 
-void OBS_settings::getAdvancedOutputSettings(Local<Array> outputSettings, config_t* config)
+void OBS_settings::getAdvancedOutputSettings(Local<Array> outputSettings, config_t* config, bool isCategoryEnabled)
 {
 	std::vector<std::vector<std::pair<std::string, std::string>>> entries;
 
 	// Streaming
-	outputSettings->Set(1, getAdvancedOutputStreamingSettings(config));
+	outputSettings->Set(1, getAdvancedOutputStreamingSettings(config, isCategoryEnabled));
 
 	// Recording
-	outputSettings->Set(2, getAdvancedOutputRecordingSettings(config));
+	outputSettings->Set(2, getAdvancedOutputRecordingSettings(config, isCategoryEnabled));
 
 	// Audio
-	getAdvancedOutputAudioSettings(outputSettings, config);
+	getAdvancedOutputAudioSettings(outputSettings, config, isCategoryEnabled);
 }
 
 Local<Array> OBS_settings::getOutputSettings()
@@ -2120,6 +2125,8 @@ Local<Array> OBS_settings::getOutputSettings()
 
 	std::string basicConfigFile = OBS_API::getBasicConfigPath();
 	config_t* config = OBS_API::openConfigFile(basicConfigFile);
+
+	bool isCategoryEnabled = !OBS_service::isStreamingOutputActive();
 
 	std::vector<std::vector<std::pair<std::string, std::string>>> entries;
 
@@ -2135,7 +2142,7 @@ Local<Array> OBS_settings::getOutputSettings()
 	outputMode.push_back(std::make_pair("Advanced", "Advanced"));
 	entries.push_back(outputMode);
 
-	outputSettings->Set(0, serializeSettingsData("Untitled", entries, config, "Output", true, true));
+	outputSettings->Set(0, serializeSettingsData("Untitled", entries, config, "Output", true, isCategoryEnabled));
 	entries.clear();
 
 	const char* currentOutputMode = config_get_string(config, "Output", "Mode");
@@ -2145,13 +2152,13 @@ Local<Array> OBS_settings::getOutputSettings()
 	}
 
 	if(strcmp(currentOutputMode, "Simple") == 0) {
-		getSimpleOutputSettings(outputSettings, config);
+		getSimpleOutputSettings(outputSettings, config, isCategoryEnabled);
 	} else if (strcmp(currentOutputMode, "Advanced") == 0) {
-		getAdvancedOutputSettings(outputSettings, config);
+		getAdvancedOutputSettings(outputSettings, config, isCategoryEnabled);
 	} else {
 		// We dont't have a great way right now to tell the frontend that an error occured
 		// The default output mode is the simple one
-		getSimpleOutputSettings(outputSettings, config);
+		getSimpleOutputSettings(outputSettings, config, isCategoryEnabled);
 	}
 
 
