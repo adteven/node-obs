@@ -909,10 +909,10 @@ void OBS_settings::getSimpleOutputSettings(Local<Array> outputSettings, config_t
 	outputSettings->Set(2, serializeSettingsData("Recording", entries, config, "SimpleOutput", true, true));
 }
 
-void OBS_settings::getEncoderSettings(Isolate *isolate, const char *encoderID, obs_data_t *settings,
+void OBS_settings::getEncoderSettings(Isolate *isolate, const obs_encoder_t *encoder, obs_data_t *settings,
 										Local<Array>* subCategoryParameters, int index)
 {
-	obs_properties_t* encoderProperties = obs_get_encoder_properties(encoderID);
+	obs_properties_t* encoderProperties = obs_encoder_properties(encoder);
 	obs_property_t* property = obs_properties_first(encoderProperties);
 
 	while(property) {
@@ -1048,10 +1048,11 @@ void OBS_settings::getEncoderSettings(Isolate *isolate, const char *encoderID, o
 				break;
 			}
 		}
-		entryObject->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-		entryObject->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
+		entryObject->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, obs_property_visible(property)));
+		entryObject->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, obs_property_enabled(property)));
 		entryObject->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
 		(*subCategoryParameters)->Set(index++, entryObject);
+
 		obs_property_next(&property);
 	}
 }
@@ -1140,18 +1141,18 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	subCategoryParameters->Set(index++, EncoderList);
 	
 	// Enforce streaming service encoder settings : boolean
-	Local<Object> EnforceBitrate = Object::New(isolate);
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "name"), String::NewFromUtf8(isolate, "EnforceBitrate"));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "type"), String::NewFromUtf8(isolate, "OBS_PROPERTY_BOOL"));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "description"),
+	Local<Object> ApplyServiceSettings = Object::New(isolate);
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "name"), String::NewFromUtf8(isolate, "ApplyServiceSettings"));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "type"), String::NewFromUtf8(isolate, "OBS_PROPERTY_BOOL"));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "description"),
 							String::NewFromUtf8(isolate, "Enforce streaming service encoder settings"));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "currentValue"),
-						Integer::New(isolate, config_get_bool(config, "AdvOut", "EnforceBitrate")));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "currentValue"),
+						Integer::New(isolate, config_get_bool(config, "AdvOut", "ApplyServiceSettings")));
 
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
-	EnforceBitrate->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
-	subCategoryParameters->Set(index++, EnforceBitrate);
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "visible"), Integer::New(isolate, true));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "enabled"), Integer::New(isolate, true));
+	ApplyServiceSettings->Set(String::NewFromUtf8(isolate, "masked"), Integer::New(isolate, false));
+	subCategoryParameters->Set(index++, ApplyServiceSettings);
 	
 	// Rescale Output : boolean
 	Local<Object> Rescale = Object::New(isolate);
@@ -1214,8 +1215,9 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	bool fileExist = (stat(path.c_str(), &buffer) == 0);
 
 	obs_data_t *settings = obs_encoder_defaults(encoderID);
+	obs_encoder_t* streamingEncoder;
 	if(!fileExist) {
-		obs_encoder_t* streamingEncoder = obs_video_encoder_create(encoderID, "streaming_h264", nullptr, nullptr);
+		streamingEncoder = obs_video_encoder_create(encoderID, "streaming_h264", nullptr, nullptr);
 		OBS_service::setStreamingEncoder(streamingEncoder);
 
 		if (!obs_data_save_json_safe(settings, path.c_str(), "tmp", "bak")) {
@@ -1224,11 +1226,11 @@ Local<Object> OBS_settings::getAdvancedOutputStreamingSettings(config_t* config)
 	} else {
 		obs_data_t *data = obs_data_create_from_json_file_safe(path.c_str(), "bak");
 		obs_data_apply(settings, data);
-		obs_encoder_t* streamingEncoder = obs_video_encoder_create(encoderID, "streaming_h264", settings, nullptr);
+		streamingEncoder = obs_video_encoder_create(encoderID, "streaming_h264", settings, nullptr);
 		OBS_service::setStreamingEncoder(streamingEncoder);
 	}
 
-	getEncoderSettings(isolate, encoderID, settings, &subCategoryParameters,index);
+	getEncoderSettings(isolate, streamingEncoder, settings, &subCategoryParameters,index);
 
 	subCategory->Set(String::NewFromUtf8(isolate, "nameSubCategory"), String::NewFromUtf8(isolate, "Streaming"));
 	subCategory->Set(String::NewFromUtf8(isolate, "parameters"), subCategoryParameters);
@@ -1477,8 +1479,9 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 	bool fileExist = (stat(path.c_str(), &buffer) == 0);
 
 	obs_data_t *settings = obs_encoder_defaults(RecEncoderCurrentValue);
+	obs_encoder_t* recordingEncoder;
 	if(!fileExist) {
-		obs_encoder_t* recordingEncoder =
+		recordingEncoder =
 			obs_video_encoder_create(RecEncoderCurrentValue, "streaming_h264", nullptr, nullptr);
 		OBS_service::setRecordingEncoder(recordingEncoder);
 
@@ -1488,12 +1491,12 @@ void OBS_settings::getStandardRecordingSettings(Local<Array>* subCategoryParamet
 	} else {
 		obs_data_t *data = obs_data_create_from_json_file_safe(path.c_str(), "bak");
 		obs_data_apply(settings, data);
-		obs_encoder_t* recordingEncoder =
+		recordingEncoder =
 			obs_video_encoder_create(RecEncoderCurrentValue, "streaming_h264", settings, nullptr);
 		OBS_service::setRecordingEncoder(recordingEncoder);
 	}
 
-	getEncoderSettings(isolate, RecEncoderCurrentValue, settings, subCategoryParameters,index);
+	getEncoderSettings(isolate, recordingEncoder, settings, subCategoryParameters,index);
 }
 
 // class OBSFFDeleter
@@ -2188,7 +2191,8 @@ void OBS_settings::saveAdvancedOutputStreamingSettings(Local<Array> settings, st
 
 		if(type.compare("OBS_PROPERTY_LIST") == 0 ||
 			type.compare("OBS_PROPERTY_EDIT_TEXT") == 0 ||
-			type.compare("OBS_PROPERTY_PATH") == 0) {
+			type.compare("OBS_PROPERTY_PATH") == 0 ||
+			type.compare("OBS_PROPERTY_TEXT") == 0) {
 			v8::String::Utf8Value param2(parameter->Get(String::NewFromUtf8(isolate, "currentValue")));
 			value = std::string(*param2);
 			if(i < indexEncoderSettings) {
@@ -2236,8 +2240,14 @@ void OBS_settings::saveAdvancedOutputStreamingSettings(Local<Array> settings, st
 	if (ret != 0) {
 		blog(LOG_WARNING, "Failed to config file %s", basicConfigFile.c_str());
 	}
-	obs_encoder_update(encoder, encoderSettings);
+	
+	bool applyServiceSettings = config_get_bool(config, "AdvOut", "ApplyServiceSettings");
 
+	if (applyServiceSettings)
+		obs_service_apply_encoder_settings(OBS_service::getService(), encoderSettings, nullptr);
+	
+	obs_encoder_update(encoder, encoderSettings);
+	
 	std::string path = OBS_API::getStreamingEncoderConfigPath();
 	if (!obs_data_save_json_safe(encoderSettings, path.c_str(), "tmp", "bak")) {
 		blog(LOG_WARNING, "Failed to save encoder %s", path.c_str());

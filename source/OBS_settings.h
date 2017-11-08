@@ -97,7 +97,7 @@ private:
 																		std::string>>* streamEncoder);
 	static std::vector<pair<int, int>> 		getOutputResolutions	(int base_cx, int base_cy);
 	static void 							getEncoderSettings		(Isolate *isolate,
-																		const char *encoderID,
+																		const obs_encoder_t *encoder,
 																		obs_data_t *settings,
 																		Local<Array>* subCategoryParameters,
 																		int index);
