@@ -61,22 +61,22 @@ private:
 
 	// Simple Output mode
 	static void 				getSimpleOutputSettings(Local<Array> outputSettings,
-														config_t* config);
+														config_t* config, bool isCategoryEnabled);
 
 	// Advanced Output mode
 	static void 				getAdvancedOutputSettings(Local<Array> outputSettings,
-															config_t* config);
+															config_t* config, bool isCategoryEnabled);
 
-	static Local<Object> 		getAdvancedOutputStreamingSettings(config_t* config);
+	static Local<Object> 		getAdvancedOutputStreamingSettings(config_t* config, bool isCategoryEnabled);
 
-	static Local<Object> 		getAdvancedOutputRecordingSettings(config_t* config);
+	static Local<Object> 		getAdvancedOutputRecordingSettings(config_t* config, bool isCategoryEnabled);
 	static void 				getStandardRecordingSettings(Local<Array>* subCategoryParameters,
-																config_t* config);
+																config_t* config, bool isCategoryEnabled);
 	static void					getFFmpegOutputRecordingSettings(Local<Array>* subCategoryParameters,
-																	config_t* config);
+																	config_t* config, bool isCategoryEnabled);
 
 	static void 				getAdvancedOutputAudioSettings(Local<Array> outputSettings,
-																config_t* config);
+																config_t* config, bool isCategoryEnabled);
 
 
 	/****** Save Output Settings ******/
@@ -100,5 +100,5 @@ private:
 																		const obs_encoder_t *encoder,
 																		obs_data_t *settings,
 																		Local<Array>* subCategoryParameters,
-																		int index);
+																		int index, bool isCategoryEnabled);
 };
