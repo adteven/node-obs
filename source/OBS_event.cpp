@@ -4,119 +4,112 @@
 
 #include <iostream>
 
-/* 
+/*
  * Source Events
  */
-class GenericSourceEventWorker : public obs::ForeignWorker
-{
-    std::string source;
+class GenericSourceEventWorker : public obs::ForeignWorker {
+	std::string source;
 
-public:
-    GenericSourceEventWorker(Nan::Callback *callback, std::string source)
-        : obs::ForeignWorker(callback), source(source){ }
+	public:
+	GenericSourceEventWorker(Nan::Callback *callback, std::string source)
+		: obs::ForeignWorker(callback), source(source) {}
 
-    void Execute() {
-        v8::Local<v8::Value> args[] = { 
-            Nan::New(source.c_str()).ToLocalChecked() 
-        };
+	void Execute() {
+		v8::Local<v8::Value> args[] = {
+		    Nan::New(source.c_str()).ToLocalChecked()
+		};
 
-        Call(1, args);
-    }
+		Call(1, args);
+	}
 };
 
-class BoolSourceEventWorker : public obs::ForeignWorker
-{
-    std::string source;
-    bool data;
+class BoolSourceEventWorker : public obs::ForeignWorker {
+	std::string source;
+	bool data;
 
-public:
-    BoolSourceEventWorker(Nan::Callback *callback, std::string source, bool data)
-        : obs::ForeignWorker(callback),
-          source(source), data(data) { }
+	public:
+	BoolSourceEventWorker(Nan::Callback *callback, std::string source, bool data)
+		: obs::ForeignWorker(callback),
+		source(source), data(data) {}
 
-    void Execute() {
+	void Execute() {
 
-        v8::Local<v8::Value> args[] = { 
-            Nan::New(source.c_str()).ToLocalChecked(), 
-            Nan::New(data)
-        };
+		v8::Local<v8::Value> args[] = {
+		    Nan::New(source.c_str()).ToLocalChecked(),
+		    Nan::New(data)
+		};
 
-        Call(2, args);
-    }
+		Call(2, args);
+	}
 };
 
-class GenericEventWorker : public obs::ForeignWorker
-{
+class GenericEventWorker : public obs::ForeignWorker {
 
-public:
-    GenericEventWorker(Nan::Callback *callback)
-        : obs::ForeignWorker(callback) { }
+	public:
+	GenericEventWorker(Nan::Callback *callback)
+		: obs::ForeignWorker(callback) {}
 
-    void Execute() {
-        Call();
-    }
+	void Execute() {
+		Call();
+	}
 };
 
-void generic_event_cb(void *data, calldata_t *cd)
-{
-    uint32_t id = reinterpret_cast<uintptr_t>(data);
-    obs::object object = g_objectManager.getObject(id);
-    Nan::Callback *cb = static_cast<Nan::Callback*>(object.handle);
-    GenericEventWorker *worker = new GenericEventWorker(cb);
-
-    worker->Send();
-}
-
-/* For signals that don't have any parameters, this works generically */
-static void generic_source_event_cb(void *data, calldata_t *cd)
-{
+void generic_event_cb(void *data, calldata_t *cd) {
 	uint32_t id = reinterpret_cast<uintptr_t>(data);
 	obs::object object = g_objectManager.getObject(id);
 	Nan::Callback *cb = static_cast<Nan::Callback*>(object.handle);
-    obs_source_t *source =
-        static_cast<obs_source_t*>(calldata_ptr(cd, "source"));
-    GenericSourceEventWorker *worker = new GenericSourceEventWorker(cb, obs_source_get_name(source));
+	GenericEventWorker *worker = new GenericEventWorker(cb);
 
-    worker->Send();
+	worker->Send();
 }
 
-static void mute_source_event_cb(void *data, calldata_t *cd)
-{
-    uint32_t id = reinterpret_cast<uint32_t>(data);
-    obs_source_t *source = 
-        static_cast<obs_source_t*>(calldata_ptr(cd, "source"));
-    obs::object object = g_objectManager.getObject(id);
-    Nan::Callback *cb = static_cast<Nan::Callback*>(object.handle);
-    /* No need for a check, we know the object is valid */
+/* For signals that don't have any parameters, this works generically */
+static void generic_source_event_cb(void *data, calldata_t *cd) {
+	uint32_t id = reinterpret_cast<uintptr_t>(data);
+	obs::object object = g_objectManager.getObject(id);
+	Nan::Callback *cb = static_cast<Nan::Callback*>(object.handle);
+	obs_source_t *source =
+		static_cast<obs_source_t*>(calldata_ptr(cd, "source"));
+	GenericSourceEventWorker *worker = new GenericSourceEventWorker(cb, obs_source_get_name(source));
 
-    BoolSourceEventWorker *worker = 
-        new BoolSourceEventWorker(cb, obs_source_get_name(source), calldata_bool(cd, "muted"));
+	worker->Send();
+}
 
-    worker->Send();
+static void mute_source_event_cb(void *data, calldata_t *cd) {
+	uint32_t id = reinterpret_cast<uint32_t>(data);
+	obs_source_t *source =
+		static_cast<obs_source_t*>(calldata_ptr(cd, "source"));
+	obs::object object = g_objectManager.getObject(id);
+	Nan::Callback *cb = static_cast<Nan::Callback*>(object.handle);
+	/* No need for a check, we know the object is valid */
+
+	BoolSourceEventWorker *worker =
+		new BoolSourceEventWorker(cb, obs_source_get_name(source), calldata_bool(cd, "muted"));
+
+	worker->Send();
 }
 
 /* FIXME: When we use the ID system for source, we can use the type checking
- * so we have only one function needed for all connect functions. 
+ * so we have only one function needed for all connect functions.
  * As it is now, we only recieve a string which doesn't give us enough information. */
 
-/* FIXME: Another case of using name for source identifier. */
+ /* FIXME: Another case of using name for source identifier. */
 static inline uint32_t source_signal_connect(
 	const char *source_name,
 	const char *event_type,
 	v8::Local<v8::Function> js_cb,
-	signal_callback_t cb)
-{
-    Nan::Callback *new_signal = 
-        new Nan::Callback(js_cb);
+	signal_callback_t cb) {
+	Nan::Callback *new_signal =
+		new Nan::Callback(js_cb);
 
-    obs_source_t *source = obs_get_source_by_name(source_name);
+	obs_source_t *source = obs_get_source_by_name(source_name);
 
-    if (!source) {
-        std::cerr << "Failed to find source: " << source_name << std::endl;
-        return 0;
-    }
+	if (!source) {
+		std::cerr << "Failed to find source: " << source_name << std::endl;
+		return 0;
+	}
 
-    signal_handler_t *handler = obs_source_get_signal_handler(source);
+	signal_handler_t *handler = obs_source_get_signal_handler(source);
 
 	uint32_t id = g_objectManager.map({ obs::object::callback, new_signal });
 
@@ -151,31 +144,30 @@ SOURCE_SIGNAL_BINDING_IMPL(OBS_signal_sourceShown, "show", generic_source_event_
 SOURCE_SIGNAL_BINDING_IMPL(OBS_signal_sourceHidden, "hide", generic_source_event_cb);
 SOURCE_SIGNAL_BINDING_IMPL(OBS_signal_sourceMuted, "mute", mute_source_event_cb);
 
-/* 
- * Global Events 
+/*
+ * Global Events
  */
 
 
 static inline uint32_t global_signal_connect(
-        const char *event_type, 
-        v8::Local<v8::Function> js_cb,
-        signal_callback_t cb)
-{
-    v8::Isolate *isolate = v8::Isolate::GetCurrent();
-    signal_handler_t *handler = obs_get_signal_handler();
+	const char *event_type,
+	v8::Local<v8::Function> js_cb,
+	signal_callback_t cb) {
+	v8::Isolate *isolate = v8::Isolate::GetCurrent();
+	signal_handler_t *handler = obs_get_signal_handler();
 
-    Nan::Callback *new_signal =
-        new Nan::Callback(js_cb);
+	Nan::Callback *new_signal =
+		new Nan::Callback(js_cb);
 
-    uint32_t id = g_objectManager.map({ obs::object::callback, new_signal });
+	uint32_t id = g_objectManager.map({ obs::object::callback, new_signal });
 
-    /* We use the void * as an integer.
-    Not the most elegant but it does work fine here. */
-    signal_handler_connect(handler,
-        event_type, cb,
-        reinterpret_cast<void*>((uintptr_t)id));
+	/* We use the void * as an integer.
+	Not the most elegant but it does work fine here. */
+	signal_handler_connect(handler,
+		event_type, cb,
+		reinterpret_cast<void*>((uintptr_t)id));
 
-    return id;
+	return id;
 }
 
 #define SIGNAL_BINDING_IMPL(name, event_type, global_cb)            \
@@ -202,34 +194,33 @@ SIGNAL_BINDING_IMPL(OBS_signal_stopTransitionVideo, "source_transition_video_sto
 SIGNAL_BINDING_IMPL(OBS_signal_stopTransition, "source_transition_stop", generic_source_event_cb);
 
 /*
- * Output Signals 
+ * Output Signals
  */
 
-/* FIXME: Output signals are just weird right now.
- * We don't pass anything back from callbacks since
- * I don't know how to work with this current setup.
- */
+ /* FIXME: Output signals are just weird right now.
+  * We don't pass anything back from callbacks since
+  * I don't know how to work with this current setup.
+  */
 static inline uint32_t output_signal_connect(
-        const char *event_type, 
-        v8::Local<v8::Function> js_cb,
-        signal_callback_t cb)
-{
-    v8::Isolate *isolate = v8::Isolate::GetCurrent();
-    signal_handler_t *handler = 
-        obs_output_get_signal_handler(OBS_service::getStreamingOutput());
+	const char *event_type,
+	v8::Local<v8::Function> js_cb,
+	signal_callback_t cb) {
+	v8::Isolate *isolate = v8::Isolate::GetCurrent();
+	signal_handler_t *handler =
+		obs_output_get_signal_handler(OBS_service::getStreamingOutput());
 
-    Nan::Callback *new_signal =
-        new Nan::Callback(js_cb);
+	Nan::Callback *new_signal =
+		new Nan::Callback(js_cb);
 
-    uint32_t id = g_objectManager.map({ obs::object::callback, new_signal });
+	uint32_t id = g_objectManager.map({ obs::object::callback, new_signal });
 
-    /* We use the void * as an integer.
-    Not the most elegant but it does work fine here. */
-    signal_handler_connect(handler,
-        event_type, cb,
-        reinterpret_cast<void*>((uintptr_t)id));
+	/* We use the void * as an integer.
+	Not the most elegant but it does work fine here. */
+	signal_handler_connect(handler,
+		event_type, cb,
+		reinterpret_cast<void*>((uintptr_t)id));
 
-    return id;
+	return id;
 }
 
 #define OUTPUT_SIGNAL_BINDING_IMPL(name, event_type, global_cb)     \

@@ -1,3 +1,23 @@
+// An experimental libobs wrapper for the Node.Js toolset.
+// Copyright(C) 2017 General Workings Inc. (Streamlabs)
+// 
+// This program is free software; you can redistribute it and / or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110 - 1301, USA.
+
+#pragma once
+
+#include "shared.h"
 #pragma once
 #include <iostream>
 #include <string>
@@ -27,8 +47,7 @@ class TestMode {
 	obs_video_info ovi;
 	OBSSource source[6];
 
-	static void render_rand(void *, uint32_t cx, uint32_t cy)
-	{
+	static void render_rand(void *, uint32_t cx, uint32_t cy) {
 		gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
 		gs_eparam_t *randomvals[3] = {
 			gs_effect_get_param_by_name(solid, "randomvals1"),
@@ -51,9 +70,8 @@ class TestMode {
 			gs_draw_sprite(nullptr, 0, cx, cy);
 	}
 
-public:
-	inline TestMode()
-	{
+	public:
+	inline TestMode() {
 		obs_get_video_info(&ovi);
 		obs_add_main_render_callback(render_rand, this);
 
@@ -64,8 +82,7 @@ public:
 		}
 	}
 
-	inline ~TestMode()
-	{
+	inline ~TestMode() {
 		for (uint32_t i = 0; i < 6; i++)
 			obs_set_output_source(i, source[i]);
 
@@ -73,8 +90,7 @@ public:
 		obs_reset_video(&ovi);
 	}
 
-	inline void SetVideo(int cx, int cy, int fps_num, int fps_den)
-	{
+	inline void SetVideo(int cx, int cy, int fps_num, int fps_den) {
 		obs_video_info newOVI = ovi;
 
 		newOVI.output_width = (uint32_t)cx;
@@ -121,13 +137,13 @@ enum class FPSType : int {
 };
 
 struct Event {
-    obs::CallbackInfo *cb_info;
+	obs::CallbackInfo *cb_info;
 
 	std::string event;
 	std::string description;
 	int percentage;
 };
-		
+
 void GetListServer(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 void InitializeAutoConfig(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -146,7 +162,7 @@ void TerminateAutoConfig(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 
 void StartThread(obs::CallbackInfo* cb);
-void StopThread(void); 
+void StopThread(void);
 
 void FindIdealHardwareResolution(void);
 bool TestSoftwareEncoding(void);
@@ -162,6 +178,6 @@ void SetDefaultSettings(void);
 void TestHardwareEncoding(void);
 bool CanTestServer(const char *server);
 
-void start_next_step(void (*task)(), std::string event, std::string description, int percentage);
+void start_next_step(void(*task)(), std::string event, std::string description, int percentage);
 
 void GetServers(std::vector<ServerInfo> &servers);

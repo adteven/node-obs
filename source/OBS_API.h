@@ -1,6 +1,23 @@
+// An experimental libobs wrapper for the Node.Js toolset.
+// Copyright(C) 2017 General Workings Inc. (Streamlabs)
+// 
+// This program is free software; you can redistribute it and / or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110 - 1301, USA.
+
 #pragma once
-#include <node.h>
-#include <obs.h>
+
+#include "shared.h"
 #include <string>
 #include <vector>
 #include <io.h>
@@ -10,8 +27,6 @@
 #include <math.h>
 #include "OBS_service.h"
 
-
-
 using namespace std;
 using namespace v8;
 
@@ -20,59 +35,31 @@ struct Screen {
 	int height;
 };
 
-class OBS_API
-{
-public:
-	OBS_API();
-	~OBS_API();
+class OBS_API {
+	public:
 
-	static void OBS_API_initAPI(const FunctionCallbackInfo<Value>& args);
-	/**
-	 * Initializes OBS
-	 *
-	 * @param  locale              The locale to use for modules
-	 * @param  module_config_path  Path to module config storage directory
-	 *                             (or NULL if none)
-	 * @param  store               The profiler name store for OBS to use or NULL
-	 */
-	static void OBS_API_initOBS_API(const FunctionCallbackInfo<Value>& args);
-    static void OBS_API_destroyOBS_API(const FunctionCallbackInfo<Value>& args);
+	static void Initialize(v8Arguments args);
+	static void Finalize(v8Arguments args);
 
-	/**
-	 * Opens all plugins module.
-	 */
-	static void OBS_API_openAllModules(const FunctionCallbackInfo<Value>& args);
+	static void LoadPlugins(v8Arguments args);
+	static void IntializePlugins(v8Arguments args);
 
-	/**
-	 * Initialize all plugins module.
-	 */
-	static void OBS_API_initAllModules(const FunctionCallbackInfo<Value>& args);
+	static void GetPerformanceStatistics(v8Arguments args);
 
-	static void OBS_API_getPerformanceStatistics(const FunctionCallbackInfo<Value>& args);
+	static void GetConfigurationDirectory(v8Arguments args);
+	static void SetConfigurationDirectory(v8Arguments args);
 
-	static void OBS_API_getPathConfigDirectory(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_setPathConfigDirectory(const FunctionCallbackInfo<Value>& args);
+	static void IsOBSStudioInstalled(v8Arguments args);
+	static std::vector<string> GetOBSStudioProfilesRaw();
+	static void GetOBSStudioProfiles(v8Arguments args);
+	static std::vector<string> GetOBSStudioSceneCollectionsRaw();
+	static void GetOBSStudioSceneCollections(v8Arguments args);
+	static void OBS_API_getOBS_currentProfile(v8Arguments args);
+	static void OBS_API_setOBS_currentProfile(v8Arguments args);
+	static void OBS_API_getOBS_currentSceneCollection(v8Arguments args);
+	static void OBS_API_setOBS_currentSceneCollection(v8Arguments args);
 
-	static void OBS_API_getOBS_existingProfiles(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_getOBS_existingSceneCollections(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_getOBS_currentProfile(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_setOBS_currentProfile(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_getOBS_currentSceneCollection(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_setOBS_currentSceneCollection(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_isOBS_installed(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_useOBS_config(const FunctionCallbackInfo<Value>& args);
-
-	static void OBS_API_test_openAllModules(const FunctionCallbackInfo<Value>& args);
-	static void OBS_API_test_initAllModules(const FunctionCallbackInfo<Value>& args);
-
-private:
-	static void initAPI(void);
-	static bool initOBS_API();
-    static void destroyOBS_API(void);
-	static vector<pair<obs_module_t *,int>> openAllModules(void);
-	static int initAllModules(void);
-	static Local<Object> getPerformanceStatistics(void);
-
+	private:
 	static double 	getCPU_Percentage(void);
 	static int 	 	getNumberOfDroppedFrames(void);
 	static double 	getDroppedFramesPercentage(void);
@@ -80,29 +67,23 @@ private:
 	static double	getCurrentFrameRate(void);
 	static bool		isOBS_installed(void);
 
-public:
-	static std::string 			getPathConfigDirectory(void);
-	static void 				setPathConfigDirectory(std::string newPathConfigDirectory);
-	static Local<Array> 		getOBS_existingProfiles(void);
-	static Local<Array> 		getOBS_existingSceneCollections(void);
-	static std::string 			getOBS_currentProfile(void);
-	static void 				setOBS_currentProfile(std::string profileName);
-	static std::string 			getOBS_currentSceneCollection(void);
-	static void 				setOBS_currentSceneCollection(std::string sceneCollectionName);
-	static bool 				isOBS_configFilesUsed(void);
-	static std::vector<Screen> 	availableResolutions(void); 
+	public:
 
 
+	static std::string getOBS_currentProfile(void);
+	static void setOBS_currentProfile(std::string profileName);
+	static std::string getOBS_currentSceneCollection(void);
+	static void setOBS_currentSceneCollection(std::string sceneCollectionName);
+	static bool isOBS_configFilesUsed(void);
+	static std::vector<Screen> availableResolutions(void);
 	static std::string getGlobalConfigPath(void);
 	static std::string getBasicConfigPath(void);
 	static std::string getServiceConfigPath(void);
 	static std::string getContentConfigPath(void);
 
-	static void setAudioDeviceMonitoring(void);
-
-	// Encoders
-	static std::string getStreamingEncoderConfigPath(void);
-	static std::string getRecordingEncoderConfigPath(void);
-
 	static config_t* openConfigFile(std::string configFile);
+
+	private:
+	OBS_API() {};
+	~OBS_API() {};
 };

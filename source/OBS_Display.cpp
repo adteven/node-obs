@@ -30,12 +30,6 @@ static BOOL CALLBACK EnumChromeWindowsProc(HWND hwnd, LPARAM lParam) {
 
 static void FixChromeD3DIssue(HWND chromeWindow) {
 	(void)EnumChildWindows(chromeWindow, EnumChromeWindowsProc, (LPARAM)NULL);
-
-	LONG_PTR style = GetWindowLongPtr(chromeWindow, GWL_STYLE);
-	if ((style & WS_CLIPCHILDREN) == 0) {
-		style |= WS_CLIPCHILDREN;
-		(void)SetWindowLongPtr(chromeWindow, GWL_STYLE, style);
-	}
 }
 
 static void RecalculateApectRatioConstrainedSize(

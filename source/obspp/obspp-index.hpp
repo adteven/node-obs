@@ -20,28 +20,28 @@
 #include <cstdint>
 
 /* A simple resuable ID generator heavily based on the IndexerV2 from Xaymar
- * https://github.com/Xaymar/BlitzUtility/blob/master/Utility/IndexerV2.cpp 
+ * https://github.com/Xaymar/BlitzUtility/blob/master/Utility/IndexerV2.cpp
  * Slightly modified to match naming consistencies. */
 
 namespace obs {
 
-class indexManager {
-private:
-    struct range {
-        uint32_t min, max;
+	class indexManager {
+		private:
+		struct range {
+			uint32_t min, max;
 
-        range(uint32_t min, uint32_t max);
-    };
+			range(uint32_t min, uint32_t max);
+		};
 
-    std::vector<indexManager::range> m_range;
+		std::vector<indexManager::range> m_range;
 
-public:
-    indexManager();
+		public:
+		indexManager();
 
-    void markUsed(uint32_t index, bool used);
-    bool isUsed(uint32_t index, bool used);
-    uint32_t generateNewIndex();
-    uint32_t countIndexes(bool used);
-};
+		void markUsed(uint32_t index, bool used);
+		bool isUsed(uint32_t index, bool used);
+		uint32_t generateNewIndex();
+		uint32_t countIndexes(bool used);
+	};
 
 }
