@@ -1,6 +1,23 @@
+// An experimental libobs wrapper for the Node.Js toolset.
+// Copyright(C) 2017 General Workings Inc. (Streamlabs)
+//
+// This program is free software; you can redistribute it and / or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110 - 1301, USA.
+
+#include "OBS_API.h"
 #include "util/platform.h"
 #include "util/lexer.h"
-#include "OBS_API.h"
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x0502
@@ -8,10 +25,8 @@
 #include "OBS_content.h"
 #include <mutex>
 #include <fstream>
-#include <locale>
 #include <codecvt>
 #include <string>
-// #include <windows.h>
 #include <ShlObj.h>
 #endif
 
@@ -36,47 +51,44 @@
 #include <util/windows/HRError.hpp>
 #include <util/windows/ComPtr.hpp>
 
-std::string appdata_path;
-vector<pair<obs_module_t *, int>> listModules;
-os_cpu_usage_info_t *cpuUsageInfo = nullptr;
+std::string g_applicationDataPath;
+std::string g_configurationPath;
+vector<pair<obs_module_t *, int>> g_pluginList;
+os_cpu_usage_info_t *g_cpuUsageInfo = nullptr;
+bool g_obsStudioIsInstalled;
+std::fstream g_logStream;
+
+std::string g_obsStudioPath;
+std::string g_obsStudioCurrentProfile;
+std::string g_obsStudioCurrentCollection;
+
+bool useOBS_configFiles = false;
+
 uint64_t lastBytesSent = 0;
 uint64_t lastBytesSentTime = 0;
-std::string pathConfigDirectory;
-std::string OBS_pathConfigDirectory;
-std::string OBS_currentProfile;
-std::string OBS_currentSceneCollection;
-bool useOBS_configFiles = false;
-bool isOBS_installedValue;
 
-OBS_API::OBS_API() {
+bool profilerRunning = false;
 
-}
-OBS_API::~OBS_API() {
-	while (listModules.size() != 0) {
-		listModules.pop_back();
-	}
-}
 
-void OBS_API::OBS_API_initAPI(const FunctionCallbackInfo<Value>& args)
-{
-	String::Utf8Value path(args[0]);
+#pragma region Utility
 
-	if (args[0]->IsString()) {
-		appdata_path = *path;
-		appdata_path += "/node-obs/";
-		pathConfigDirectory = *path;
-	}
-	else {
+void OBS_API::OBS_API_initAPI(const FunctionCallbackInfo<Value>& args) {
+	MAKE_ISOLATE(isolate);
+
+	// Test Argument length and type.
+	if ((args.Length() >= 1) && args[0]->IsString()) {
+		g_applicationDataPath = g_configurationPath = std::string(*String::Utf8Value(args[0]));
+		g_applicationDataPath += "/node-obs/";
+	} else {
 		char *tmp;
-		appdata_path = tmp = os_get_config_path_ptr("node-obs/");
-		bfree(tmp);
+		g_applicationDataPath = tmp = os_get_config_path_ptr("node-obs/");
+			bfree(tmp);
 	}
 
 	initAPI();
 }
 
-static string GenerateTimeDateFilename(const char *extension)
-{
+static string GenerateTimeDateFilename(const char *extension) {
 	time_t    now = time(0);
 	char      file[256] = {};
 	struct tm *cur_time;
@@ -95,30 +107,29 @@ static string GenerateTimeDateFilename(const char *extension)
 }
 
 static void stdout_log_handler(int log_level, const char *format,
-		va_list args, void *param)
-{
+		va_list args, void *param) {
 	char out[4096];
 	vsnprintf(out, sizeof(out), format, args);
 
 	switch (log_level) {
-	case LOG_DEBUG:
-		fprintf(stdout, "debug: %s\n", out);
-		fflush(stdout);
-		break;
+		case LOG_DEBUG:
+			fprintf(stdout, "debug: %s\n", out);
+			fflush(stdout);
+			break;
 
-	case LOG_INFO:
-		fprintf(stdout, "info: %s\n", out);
-		fflush(stdout);
-		break;
+		case LOG_INFO:
+			fprintf(stdout, "info: %s\n", out);
+			fflush(stdout);
+			break;
 
-	case LOG_WARNING:
-		fprintf(stdout, "warning: %s\n", out);
-		fflush(stdout);
-		break;
+		case LOG_WARNING:
+			fprintf(stdout, "warning: %s\n", out);
+			fflush(stdout);
+			break;
 
-	case LOG_ERROR:
-		fprintf(stderr, "error: %s\n", out);
-		fflush(stderr);
+		case LOG_ERROR:
+			fprintf(stderr, "error: %s\n", out);
+			fflush(stderr);
 	}
 
 	UNUSED_PARAMETER(param);
@@ -126,8 +137,7 @@ static void stdout_log_handler(int log_level, const char *format,
 
 void node_obs_log
 		(int log_level, const char *msg,
-		 va_list args, void *param)
-{
+		 va_list args, void *param) {
 	fstream &logFile = *static_cast<fstream*>(param);
 	char str[4096];
 
@@ -137,7 +147,7 @@ void node_obs_log
 	stdout_log_handler(log_level, msg, args, nullptr);
 	vsnprintf(str, 4095, msg, args2);
 
-#ifdef _WIN32
+	#ifdef _WIN32
 	if (IsDebuggerPresent()) {
 		int wNum = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
 		if (wNum > 1) {
@@ -154,7 +164,7 @@ void node_obs_log
 			OutputDebugStringW(wide_buf.c_str());
 		}
 	}
-#endif
+	#endif
 
 	char *tmp_str = str;
 	char *nextLine = tmp_str;
@@ -177,14 +187,13 @@ void node_obs_log
 
 	logFile << tmp_str << endl;
 
-#if defined(_WIN32) && defined(OBS_DEBUGBREAK_ON_ERROR)
+	#if defined(_WIN32) && defined(OBS_DEBUGBREAK_ON_ERROR)
 	if (log_level <= LOG_ERROR && IsDebuggerPresent())
 		__debugbreak();
-#endif
+	#endif
 }
 
-static bool get_token(lexer *lex, string &str, base_token_type type)
-{
+static bool get_token(lexer *lex, string &str, base_token_type type) {
 	base_token token;
 	if (!lexer_getbasetoken(lex, &token, IGNORE_WHITESPACE))
 		return false;
@@ -195,8 +204,7 @@ static bool get_token(lexer *lex, string &str, base_token_type type)
 	return true;
 }
 
-static bool expect_token(lexer *lex, const char *str, base_token_type type)
-{
+static bool expect_token(lexer *lex, const char *str, base_token_type type) {
 	base_token token;
 	if (!lexer_getbasetoken(lex, &token, IGNORE_WHITESPACE))
 		return false;
@@ -206,24 +214,23 @@ static bool expect_token(lexer *lex, const char *str, base_token_type type)
 	return strref_cmp(&token.text, str) == 0;
 }
 
-/* os_dirent mimics POSIX dirent structure. 
- * Perhaps a better cross-platform solution can take 
+/* os_dirent mimics POSIX dirent structure.
+ * Perhaps a better cross-platform solution can take
  * place but this is as cross-platform as it gets
  * for right now.  */
-static uint64_t convert_log_name(const char *name)
-{
+static uint64_t convert_log_name(const char *name) {
 	lexer  lex;
 	string     year, month, day, hour, minute, second;
 
 	lexer_init(&lex);
 	lexer_start(&lex, name);
 
-	if (!get_token(&lex, year,   BASETOKEN_DIGIT)) return 0;
+	if (!get_token(&lex, year, BASETOKEN_DIGIT)) return 0;
 	if (!expect_token(&lex, "-", BASETOKEN_OTHER)) return 0;
-	if (!get_token(&lex, month,  BASETOKEN_DIGIT)) return 0;
+	if (!get_token(&lex, month, BASETOKEN_DIGIT)) return 0;
 	if (!expect_token(&lex, "-", BASETOKEN_OTHER)) return 0;
-	if (!get_token(&lex, day,    BASETOKEN_DIGIT)) return 0;
-	if (!get_token(&lex, hour,   BASETOKEN_DIGIT)) return 0;
+	if (!get_token(&lex, day, BASETOKEN_DIGIT)) return 0;
+	if (!get_token(&lex, hour, BASETOKEN_DIGIT)) return 0;
 	if (!expect_token(&lex, "-", BASETOKEN_OTHER)) return 0;
 	if (!get_token(&lex, minute, BASETOKEN_DIGIT)) return 0;
 	if (!expect_token(&lex, "-", BASETOKEN_OTHER)) return 0;
@@ -235,8 +242,7 @@ static uint64_t convert_log_name(const char *name)
 	return std::stoull(timestring);
 }
 
-static void delete_oldest_file(const char *location, unsigned maxLogs)
-{
+static void delete_oldest_file(const char *location, unsigned maxLogs) {
 	string           oldestLog;
 	uint64_t         oldest_ts = (uint64_t)-1;
 	struct os_dirent *entry;
@@ -274,103 +280,77 @@ static void delete_oldest_file(const char *location, unsigned maxLogs)
 		os_unlink(delPath.c_str());
 	}
 }
+#pragma endregion Utility
 
-void OBS_API::OBS_API_initOBS_API(const FunctionCallbackInfo<Value>& args) {
-	String::Utf8Value path(args[0]);
+void OBS_API::OBS_API_initOBS_API(v8Arguments args) {
+	MAKE_ISOLATE(isolate)
 
-	if (args[0]->IsString()) {
-		appdata_path = *path;
-		appdata_path += "/node-obs/";
-		pathConfigDirectory = *path;
-	}
-	else {
+	// Test Argument length and type.
+	if ((args.Length() >= 1) && args[0]->IsString()) {
+		g_applicationDataPath = g_configurationPath = std::string(*String::Utf8Value(args[0]));
+		g_applicationDataPath += "/node-obs/";
+	} else {
 		char *tmp;
 		appdata_path = tmp = os_get_config_path_ptr("node-obs/");
-		bfree(tmp);
+		g_applicationDataPath = tmp = os_get_config_path_ptr("node-obs/");
+			bfree(tmp);
 	}
 
 	initOBS_API();
 }
 
 void OBS_API::OBS_API_destroyOBS_API(const FunctionCallbackInfo<Value>& args) {
-    destroyOBS_API();
-}
+	#ifdef _WIN32
+		std::string basicConfigFile = OBS_API::getBasicConfigPath();
+		config_t* config = OBS_API::openConfigFile(basicConfigFile);
 
-void OBS_API::OBS_API_openAllModules(const FunctionCallbackInfo<Value>& args) {
-	openAllModules();
-}
+		bool disableAudioDucking = config_get_bool(config, "Audio",
+				"DisableAudioDucking");
+		if (disableAudioDucking)
+			DisableAudioDucking(false);
+	#endif
 
-void OBS_API::OBS_API_initAllModules(const FunctionCallbackInfo<Value>& args) {
-	initAllModules();
-}
+	obs_encoder_t* streamingEncoder = OBS_service::getStreamingEncoder();
+	if(streamingEncoder != NULL)
+		obs_encoder_release(streamingEncoder);
 
-void OBS_API::OBS_API_getPerformanceStatistics(const FunctionCallbackInfo<Value>& args) {
-	Isolate* isolate = args.GetIsolate();
+	obs_encoder_t* recordingEncoder = OBS_service::getRecordingEncoder();
+	if(recordingEncoder != NULL)
+		obs_encoder_release(recordingEncoder);
 
-	Local<Object> statistics = getPerformanceStatistics();
+	obs_encoder_t* audioEncoder = OBS_service::getAudioEncoder();
+	if(audioEncoder != NULL)
+		obs_encoder_release(audioEncoder);
 
-	args.GetReturnValue().Set(statistics);	
-}
+	obs_output_t* streamingOutput = OBS_service::getStreamingOutput();
+	if(streamingOutput != NULL)
+		obs_output_release(streamingOutput);
 
-void OBS_API::OBS_API_getPathConfigDirectory(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
+	obs_output_t* recordingOutput = OBS_service::getRecordingOutput();
+	if(recordingOutput != NULL)
+		obs_output_release(recordingOutput);
 
-	args.GetReturnValue().Set(String::NewFromUtf8(isolate, getPathConfigDirectory().c_str()));
-}
+	obs_service_t* service = OBS_service::getService();
+	if(service != NULL)
+		obs_service_release(service);
 
-void OBS_API::OBS_API_setPathConfigDirectory(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
-
-	v8::String::Utf8Value param1(args[0]->ToString());
-	std::string pathConfigDirectory = std::string(*param1);	
-
-	setPathConfigDirectory(pathConfigDirectory);
-}
-
-void OBS_API::OBS_API_getOBS_existingProfiles(const FunctionCallbackInfo<Value>& args)
-{
-	args.GetReturnValue().Set(getOBS_existingProfiles());
-}
-
-void OBS_API::OBS_API_getOBS_existingSceneCollections(const FunctionCallbackInfo<Value>& args)
-{
-	args.GetReturnValue().Set(getOBS_existingSceneCollections());
-}
-
-void OBS_API::OBS_API_getOBS_currentProfile(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
-
-	args.GetReturnValue().Set(String::NewFromUtf8(isolate, getOBS_currentProfile().c_str()));
-}
-
-void OBS_API::OBS_API_setOBS_currentProfile(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
-
-	v8::String::Utf8Value param1(args[0]->ToString());
-	std::string currentProfile = std::string(*param1);	
-
-	setOBS_currentProfile(currentProfile);	
-}
-
-void OBS_API::OBS_API_getOBS_currentSceneCollection(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
-
-	args.GetReturnValue().Set(String::NewFromUtf8(isolate, getOBS_currentSceneCollection().c_str()));
-}
-
-void OBS_API::OBS_API_setOBS_currentSceneCollection(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
-
-	v8::String::Utf8Value param1(args[0]->ToString());
-	std::string currentSceneCollection = std::string(*param1);	
-
-	setOBS_currentSceneCollection(currentSceneCollection);	
+	if (obs_initialized()) {
+		if (g_cpuUsageInfo) {
+			os_cpu_usage_info_destroy(g_cpuUsageInfo);
+			g_cpuUsageInfo = nullptr;
+		}
+		if(profilerRunning) {
+			profiler_stop();
+			auto snapshot = profile_snapshot_create();
+			profiler_print(snapshot);
+			profiler_print_time_between_calls(snapshot);
+			SaveProfilerData(snapshot);
+			profile_snapshot_free(snapshot);
+			profiler_free();
+		}
+		obs_shutdown();
+	}
+	args.GetReturnValue().Set(!obs_initialized());
 }
 
 void OBS_API::OBS_API_isOBS_installed(const FunctionCallbackInfo<Value>& args)
@@ -380,66 +360,22 @@ void OBS_API::OBS_API_isOBS_installed(const FunctionCallbackInfo<Value>& args)
 	args.GetReturnValue().Set(Integer::New(isolate, isOBS_installed()));
 }
 
-void OBS_API::OBS_API_useOBS_config(const FunctionCallbackInfo<Value>& args)
-{
-	Isolate* isolate = args.GetIsolate();
-
-	useOBS_configFiles = true;
-
-	String::Utf8Value currentProfile(args[0]);
-	String::Utf8Value currentSceneCollection(args[1]);
-
-	setOBS_currentProfile(*currentProfile);
-	setOBS_currentSceneCollection(*currentSceneCollection);
-
-	pathConfigDirectory = OBS_pathConfigDirectory;
-}
-
-void OBS_API::OBS_API_test_openAllModules(const FunctionCallbackInfo<Value>& args) {
-	Isolate* isolate = args.GetIsolate();
-	openAllModules();
-
-	string result = "SUCCESS";
-
-	for (int i = 0; i < listModules.size(); i++) {
-		if (listModules.at(i).second != MODULE_SUCCESS) {
-			result = "FAILURE";
-		}
-	}
-
-	args.GetReturnValue().Set(String::NewFromUtf8(isolate, result.c_str()));
-}
-
-void OBS_API::OBS_API_test_initAllModules(const FunctionCallbackInfo<Value>& args) {
-	Isolate* isolate = args.GetIsolate();
-	string result;
-	if (initAllModules() == 0) {
-		result = "SUCCESS";
-	} else {
-		result = "FAILURE";
-	}
-	args.GetReturnValue().Set(String::NewFromUtf8(isolate, result.c_str()));
-}
-
-int GetConfigPath(char *path, size_t size, const char *name)
-{
+int GetConfigPath(char *path, size_t size, const char *name) {
 	return os_get_config_path(path, size, name);
 }
 
-bool dirExists(const std::string& path)
-{
+bool dirExists(const std::string& path) {
   DWORD ftyp = GetFileAttributesA(path.c_str());
   if (ftyp == INVALID_FILE_ATTRIBUTES)
-    return false;  
+    return false;
 
   if (ftyp & FILE_ATTRIBUTE_DIRECTORY)
-    return true;   
+    return true;
 
   return false;
 }
 
-bool containsDirectory(const std::string& path)
-{
+bool containsDirectory(const std::string& path) {
 	const char* pszDir = path.c_str();
     char szBuffer[MAX_PATH];
 
@@ -564,71 +500,42 @@ void OBS_API::setAudioDeviceMonitoring(void)
 #endif
 }
 
-bool OBS_API::initOBS_API()
+bool OBS_API::initOBS_API(bool startProfiler)
 {
-	std::vector<char> userData = std::vector<char>(1024);
-	os_get_config_path(userData.data(), userData.capacity() - 1, "slobs-client/plugin_config");
-	obs_startup("en-US", userData.data(), NULL);
-    cpuUsageInfo = os_cpu_usage_info_start();
+	// Initialize libOBS
+	std::string t_nodeObsData = g_configurationPath + "/plugin_config/";
+	obs_startup("en-US", t_nodeObsData.data(), NULL);
 
-	//Setting obs-studio config directory
-	char path[512];
-	int ret = GetConfigPath(path, 512, "obs-studio");
+	// Track CPU Usage
+	g_cpuUsageInfo = os_cpu_usage_info_start();
 
-	if(ret > 0) {
-		OBS_pathConfigDirectory = path;
+	// Profiling
+	if (startProfiler) {
+		profilerRunning = true;
+		profiler_start();
 	}
 
-	std::string profiles = OBS_pathConfigDirectory + "\\basic\\profiles";
-	std::string scenes = OBS_pathConfigDirectory + "\\basic\\scenes";
-
-	isOBS_installedValue = dirExists(OBS_pathConfigDirectory) &&
-		containsDirectory(profiles) &&
-		os_file_exists(scenes.c_str());
-
-	if(isOBS_installedValue) {
-	    v8::String::Utf8Value firstProfile(getOBS_existingProfiles()->Get(0)->ToString());
-	    OBS_currentProfile = std::string(*firstProfile);
-
-	    v8::String::Utf8Value firstSceneCollection(getOBS_existingSceneCollections()->Get(0)->ToString());
-	    OBS_currentSceneCollection = std::string(*firstSceneCollection);
+	// Logging
+	std::string logFileName = GenerateTimeDateFilename("txt");
+	std::string logPath = g_applicationDataPath + "/logs/";
+	if (os_mkdirs(logPath.c_str()) == MKDIR_ERROR) {
+		std::cerr << "Unable to create directory for log files." << std::endl;
+	} else {
+		delete_oldest_file(logPath.c_str(), 3);
+		std::string logFull = logPath + logFileName;
+		g_logStream = std::fstream(logFull, ios_base::out | ios_base::trunc);
+		if (g_logStream.bad()) {
+			std::cerr << "Unable to create log file." << std::endl;
+		} else {
+			base_set_log_handler(node_obs_log, &g_logStream);
+		}
 	}
-
-	/* Logging */
-	string filename = GenerateTimeDateFilename("txt");
-	string log_path = appdata_path;
-	log_path.append("/logs/");
-
-	/* Make sure the path is created
-	   before attempting to make a file there. */
-	if (os_mkdirs(log_path.c_str()) == MKDIR_ERROR) {
-		cerr << "Failed to open log file" << endl;
-	}
-
-	delete_oldest_file(log_path.c_str(), 3);
-	log_path.append(filename);
-
-	/* Leak although not that big of a deal since it should always be open. */
-	fstream *logfile = new fstream(log_path, ios_base::out | ios_base::trunc);
-
-	if (!logfile) {
-		cerr << "Failed to open log file" << endl;
-	}
-
-	/* Delete oldest file in the folder to imitate rotating */
-	base_set_log_handler(node_obs_log, logfile);
-
-	/* Profiling */
-	//profiler_start();
-
-
 
 	return obs_initialized();
 }
 
-static void SaveProfilerData(const profiler_snapshot_t *snap)
-{
-	string dst(appdata_path);
+static void SaveProfilerData(const profiler_snapshot_t *snap) {
+	string dst(g_applicationDataPath);
 	dst.append("profiler_data/");
 
 	if (os_mkdirs(dst.c_str()) == MKDIR_ERROR) {
@@ -640,54 +547,6 @@ static void SaveProfilerData(const profiler_snapshot_t *snap)
 	if (!profiler_snapshot_dump_csv_gz(snap, dst.c_str()))
 		blog(LOG_WARNING, "Could not save profiler data to '%s'",
 				dst.c_str());
-}
-
-void OBS_API::destroyOBS_API(void) {
-    os_cpu_usage_info_destroy(cpuUsageInfo);
-
-#ifdef _WIN32
-	std::string basicConfigFile = OBS_API::getBasicConfigPath();
-	config_t* config = OBS_API::openConfigFile(basicConfigFile);
-
-	bool disableAudioDucking = config_get_bool(config, "Audio",
-			"DisableAudioDucking");
-	if (disableAudioDucking)
-		DisableAudioDucking(false);
-#endif
-
-	obs_encoder_t* streamingEncoder = OBS_service::getStreamingEncoder();
-	if(streamingEncoder != NULL)
-		obs_encoder_release(streamingEncoder);
-
-	obs_encoder_t* recordingEncoder = OBS_service::getRecordingEncoder();
-	if(recordingEncoder != NULL)
-		obs_encoder_release(recordingEncoder);
-
-	obs_encoder_t* audioEncoder = OBS_service::getAudioEncoder();
-	if(audioEncoder != NULL)
-		obs_encoder_release(audioEncoder);
-
-	obs_output_t* streamingOutput = OBS_service::getStreamingOutput();
-	if(streamingOutput != NULL)
-		obs_output_release(streamingOutput);
-
-	obs_output_t* recordingOutput = OBS_service::getRecordingOutput();
-	if(recordingOutput != NULL)
-		obs_output_release(recordingOutput);
-
-	obs_service_t* service = OBS_service::getService();
-	if(service != NULL)
-		obs_service_release(service);
-
-    obs_shutdown();
-
-    /*profiler_stop();
-	auto snapshot = profile_snapshot_create();
-	profiler_print(snapshot);
-	profiler_print_time_between_calls(snapshot);
-	SaveProfilerData(snapshot);
-	profile_snapshot_free(snapshot);
-	profiler_free();*/
 }
 
 void replaceAll(std::string& str, const std::string& from, const std::string& to) {
@@ -815,6 +674,7 @@ vector<pair<obs_module_t *, int>>  OBS_API::openAllModules(void) {
 
 int OBS_API::initAllModules(void) {
 	int error = 0;
+
 	for (int i = 0; i < listModules.size(); i++) {
 		if (listModules.at(i).second == MODULE_SUCCESS) {
 			if (!obs_init_module(listModules.at(i).first)) {
@@ -822,13 +682,12 @@ int OBS_API::initAllModules(void) {
 			}
 		}
 	}
-	getPerformanceStatistics();
+
 	return error;
 }
 
-Local<Object> OBS_API::getPerformanceStatistics(void) 
-{
-	Isolate *isolate = v8::Isolate::GetCurrent();
+void OBS_API::OBS_API_getPerformanceStatistics(v8Arguments args) {
+	Isolate* isolate = args.GetIsolate();
 	Local<Object> statistics = Object::New(isolate);
 
 	statistics->Set(String::NewFromUtf8(isolate, "CPU"), Number::New(isolate, getCPU_Percentage()));
@@ -837,7 +696,7 @@ Local<Object> OBS_API::getPerformanceStatistics(void)
 	statistics->Set(String::NewFromUtf8(isolate, "bandwidth"), Number::New(isolate, getCurrentBandwidth()));
 	statistics->Set(String::NewFromUtf8(isolate, "frameRate"), Number::New(isolate, getCurrentFrameRate()));
 
-	return statistics;
+	args.GetReturnValue().Set(statistics);
 }
 
 double OBS_API::getCPU_Percentage(void)
@@ -851,28 +710,24 @@ double OBS_API::getCPU_Percentage(void)
 	return cpuPercentage;
 }
 
-int OBS_API::getNumberOfDroppedFrames(void)
-{
+int OBS_API::getNumberOfDroppedFrames(void) {
 	obs_output_t* streamOutput = OBS_service::getStreamingOutput();
 	
 	int totalDropped = 0;
 
-	if(obs_output_active(streamOutput))
-	{
+	if(obs_output_active(streamOutput)) {
 		totalDropped = obs_output_get_frames_dropped(streamOutput);
 	}
 
 	return totalDropped;
 }
 
-double OBS_API::getDroppedFramesPercentage(void)
-{
+double OBS_API::getDroppedFramesPercentage(void) {
 	obs_output_t* streamOutput = OBS_service::getStreamingOutput();
-	
+
 	double percent = 0;
 
-	if(obs_output_active(streamOutput))
-	{
+	if(obs_output_active(streamOutput)) {
 		int totalDropped = obs_output_get_frames_dropped(streamOutput);
 		int totalFrames  = obs_output_get_total_frames(streamOutput);
 		percent   = (double)totalDropped / (double)totalFrames * 100.0;
@@ -881,14 +736,12 @@ double OBS_API::getDroppedFramesPercentage(void)
 	return percent;
 }
 
-double OBS_API::getCurrentBandwidth(void)
-{
+double OBS_API::getCurrentBandwidth(void) {
 	obs_output_t* streamOutput = OBS_service::getStreamingOutput();
 
 	double kbitsPerSec = 0;
 
-	if(obs_output_active(streamOutput))
-	{
+	if(obs_output_active(streamOutput)) {
 		uint64_t bytesSent     = obs_output_get_total_bytes(streamOutput);
 		uint64_t bytesSentTime = os_gettime_ns();
 
@@ -897,27 +750,25 @@ double OBS_API::getCurrentBandwidth(void)
 		if (bytesSent == 0)
 			lastBytesSent = 0;
 
-		uint64_t bitsBetween   = (bytesSent - lastBytesSent) * 8;
+		uint64_t bitsBetween = (bytesSent - lastBytesSent) * 8;
 
 		double timePassed = double(bytesSentTime - lastBytesSentTime) /
 			1000000000.0;
 
 		kbitsPerSec = double(bitsBetween) / timePassed / 1000.0;
 
-		lastBytesSent        = bytesSent;
-		lastBytesSentTime    = bytesSentTime;
+		lastBytesSent = bytesSent;
+		lastBytesSentTime = bytesSentTime;
 	}
 
 	return kbitsPerSec;
 }
 
-double OBS_API::getCurrentFrameRate(void)
-{
+double OBS_API::getCurrentFrameRate(void) {
 	return obs_get_active_fps();
 }
 
-std::string OBS_API::getPathConfigDirectory(void)
-{
+std::string OBS_API::getPathConfigDirectory(void) {
 	return pathConfigDirectory;
 }
 

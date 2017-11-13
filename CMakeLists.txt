@@ -86,6 +86,7 @@ include_directories(
 
 # Source
 SET(PROJECT_HEADERS
+#	"${PROJECT_SOURCE_DIR}/source/shared.h"
 	"${PROJECT_SOURCE_DIR}/source/obspp/obspp-index.hpp"
 	"${PROJECT_SOURCE_DIR}/source/obspp/obspp-manager.hpp"
 	"${PROJECT_SOURCE_DIR}/source/audio-encoders.h"
