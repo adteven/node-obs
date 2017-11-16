@@ -214,8 +214,8 @@ IF (NOT APPLE)
 
 	# Plugin Data
 	INSTALL(DIRECTORY "${obsBuildPathOpt}/rundir/RelWithDebInfo/data/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/data")
-	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/data/" DESTINATION "${obsBuildPath}/rundir/RelWithDebInfo/data")
+	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/data/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/data")
 ELSE()
 	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/obs-plugins/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/obs-plugins")
-	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/data/" DESTINATION "${obsBuildPath}/rundir/RelWithDebInfo/data")
+	INSTALL(DIRECTORY "${obsBuildPath}/rundir/RelWithDebInfo/data/" DESTINATION "${node-obs_BINARY_DIR}/distribute/node-obs/data")
 ENDIF()

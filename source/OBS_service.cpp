@@ -1812,9 +1812,11 @@ void OBS_service::updateVideoRecordingEncoder()
     ffmpegOutput = false;
 
 	if (strcmp(quality, "Stream") == 0) {
-        obs_encoder_release(videoRecordingEncoder);
-		videoRecordingEncoder = videoStreamingEncoder;
-		usingRecordingPreset = false;
+		if (videoRecordingEncoder != videoStreamingEncoder) {
+			obs_encoder_release(videoRecordingEncoder);
+			videoRecordingEncoder = videoStreamingEncoder;
+			usingRecordingPreset = false;
+		}
 		return;
 
 	} else if (strcmp(quality, "Lossless") == 0) {
