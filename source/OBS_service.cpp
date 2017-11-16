@@ -23,13 +23,54 @@ bool recordingConfigured = false;
 bool ffmpegOutput = false;
 bool lowCPUx264 = false;
 
-struct callbackOutputState {
+struct Event {
+    obs::CallbackInfo *cb_info;
+
+	std::string signal;
+};
+
+void event_main_loop_cb(uv_async_t* handle);
+
+// obs::CallbackQueue<Event> eventCallbackQueue(event_main_loop_cb);
+
+void event_main_loop_cb(uv_async_t* handle) {
+// 	v8::Isolate *isolate = v8::Isolate::GetCurrent();
+
+// 	std::unique_lock<std::mutex> lock(eventCallbackQueue.mutex);
+
+//    	while (!eventCallbackQueue.work_queue.empty()) {
+//         auto &data = eventCallbackQueue.work_queue.front();
+
+//         if (data.cb_info->stopped)
+//             goto next_element;
+
+//         auto result = Nan::New<v8::Object>();
+
+//         Nan::Set(result,
+//             Nan::New("signal").ToLocalChecked(),
+//             Nan::New(data.signal.c_str()).ToLocalChecked());
+
+//         v8::Local<v8::Value> params[] = {
+//             result
+//         };
+
+//         data.cb_info->callback.Call(1, params);
+
+// next_element:
+//         eventCallbackQueue.work_queue.pop_front();
+//     }
+}
+
+obs::CallbackInfo *callback;
+std::vector<std::pair<std::string, obs::CallbackInfo*>> signalsOutput;
+
+struct callbackOutputStates {
 	std::vector<std::string> signals;
     obs::CallbackInfo *cb;
 };
 
-callbackOutputState *streamingOutputState;
-callbackOutputState *recordingOutputState;
+callbackOutputStates *streamingOutputStates;
+callbackOutputStates *recordingOutputStates;
 
 OBS_service::OBS_service()
 {
@@ -87,6 +128,9 @@ void OBS_service::OBS_service_createRecordingOutput(const FunctionCallbackInfo<V
 
 void OBS_service::OBS_service_startStreaming(const FunctionCallbackInfo<Value>& args)
 {
+    v8::Local<v8::Function> function = args[0].As<v8::Function>();
+    callback = new obs::CallbackInfo(function);
+    
 	startStreaming();
 }
 
@@ -1279,20 +1323,29 @@ void OBS_service::createRecordingOutput(void)
     // updateRecordingOutput();
 }
 
-void connectSignals(obs_output_t *output, callbackOutputState *callbackSignals) {
+
+void connectSignals(obs_output_t *output, std::vector<std::pair<std::string, obs::CallbackInfo*>> *callbackSignals) {
     signal_handler *sh = obs_output_get_signal_handler(output);
 
-    std::vector<std::string> signals = callbackSignals->signals;
+	if (!output || !callbackSignals)
+		return;
 
-    for(int i=0;i<signals.size();i++) {
+    for(int i=0;i<callbackSignals->size();i++) {
         auto function = [] (void *data, calldata_t *)
         {
-            std::pair<std::string, obs::CallbackInfo*> &signal =
-            *reinterpret_cast<std::pair<std::string, obs::CallbackInfo*>*>(data);
+			// std::pair<std::string, obs::CallbackInfo*> &signal =
+            // 	*reinterpret_cast<std::pair<std::string, obs::CallbackInfo*>*>(data);
+            
+            // std::string &signal = *reinterpret_cast<std::string*>(data);
+            
+			callbackOutputStates &signal =
+            *reinterpret_cast<callbackOutputStates*>(data);
         };
-        std::pair<std::string, obs::CallbackInfo*> signalCallback =
-            std::make_pair(signals.at(i), callbackSignals->cb);
-        signal_handler_connect(sh, signals.at(i).c_str(), function, &(signals.at(i)));
+        // std::pair<std::string, obs::CallbackInfo*> signalCallback =
+        //    std::make_pair(callbackSignals->signals.at(i), nullptr);
+		signal_handler_connect(sh, callbackSignals->at(i).first.c_str(), function, &callbackSignals->at(i));
+
+		// signal_handler_connect(sh, signals.at(i).c_str(), function, &callbackSignals->signals.at(i));
     }
 }
 
@@ -1301,7 +1354,19 @@ bool OBS_service::startStreaming(void)
     updateService();
     updateStreamSettings();
 
-    connectSignals(streamingOutput, streamingOutputState);
+    signalsOutput.clear();
+    signalsOutput.push_back(std::make_pair(OUTPUT_START, callback));
+    signalsOutput.push_back(std::make_pair(OUTPUT_STOP, callback));
+    signalsOutput.push_back(std::make_pair(OUTPUT_STARTING, callback));
+    signalsOutput.push_back(std::make_pair(OUTPUT_STOPPING, callback));
+    signalsOutput.push_back(std::make_pair(OUTPUT_DESACTIVATE, callback));
+    signalsOutput.push_back(std::make_pair(OUTPUT_RECONNECT, callback));
+    signalsOutput.push_back(std::make_pair(OUTPUT_RECONNECT_SUCCESS, callback));
+
+    // streamingOutputStates = new callbackOutputStates;
+    // streamingOutputStates->signals = signalsOutput;
+
+    connectSignals(streamingOutput, &signalsOutput);
 
     return obs_output_start(streamingOutput);
 }

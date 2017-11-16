@@ -1,7 +1,6 @@
 #pragma once
 #include <iostream>
 #include <string>
-#pragma once
 #include <thread>
 #include <mutex>
 #include <obs.hpp>
@@ -10,6 +9,7 @@
 #include "OBS_service.h"
 #include "OBS_common.h"
 #include <v8.h>
+#pragma once
 
 struct ServerInfo {
 	std::string name;
